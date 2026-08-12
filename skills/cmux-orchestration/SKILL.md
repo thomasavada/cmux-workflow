@@ -743,9 +743,17 @@ it from outside, so "sent it, saw no error" gets misread as "it ran". A probe mu
 
 ### 5.1 · What state is every lane in? — start here
 
-⚠️ `${CLAUDE_PLUGIN_ROOT}` is NOT set in the Bash tool environment — only for hook commands.
-Resolve it first or the path collapses to `/skills/…` and the script "does not exist"
-*(measured on a real install, 2026-08-13)*:
+⚠️ **Two facts about CLAUDE_PLUGIN_ROOT, and they pull in opposite directions** *(both
+measured on a real install, 2026-08-13)*:
+
+- Claude Code **substitutes** that placeholder when it loads a skill or command markdown
+  file — including inside ordinary prose, which is why this paragraph spells the name out
+  instead of writing it as a shell variable.
+- It is **not an environment variable**. Type it into a Bash command yourself and the shell
+  expands an unset name to nothing, so the path collapses to `/skills/…` and the script
+  "does not exist".
+
+So resolve it explicitly in any command you compose, and it works either way:
 
 ```bash
 ROOT="${CLAUDE_PLUGIN_ROOT:-}"
