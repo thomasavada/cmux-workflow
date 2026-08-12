@@ -429,20 +429,20 @@ The fix is one command, run immediately after `new-split`:
 
 ```bash
 cmux new-split right                                    # → OK surface:431 workspace:5
-cmux rename-tab --surface surface:431 "WT-5 dimensions" # → OK action=rename tab=tab:431
+cmux rename-tab --surface surface:431 "A1 auth-refactor" # → OK action=rename tab=tab:431
 ```
 
 `list-pane-surfaces` then answers "which lane is this" without you remembering anything:
 
 ```
 --- pane:281 ---
-* surface:431  WT-5 dimensions  [selected]
+* surface:431  A1 auth-refactor  [selected]
 --- pane:282 ---
-* surface:432  WT-6 partitions  [selected]
+* surface:432  A2 rate-limit  [selected]
 ```
 
-**Name it with the lane ID from the brief**, not a description — `WT-5 dimensions`, `WC2 cascade`,
-`W0-B visibility`. The ID is what the plan file, the dispatch string, the commit message and your
+**Name it with the lane ID from the brief**, not a description — `A1 auth-refactor`, `A2 rate-limit`,
+`B7 cache-layer`. The ID is what the plan file, the dispatch string, the commit message and your
 own notes all use; a prettier name breaks that chain.
 
 Three reasons this earns its one line:
@@ -450,7 +450,7 @@ Three reasons this earns its one line:
 1. **The user sees it too.** They are watching these panes. An unnamed tab tells them nothing about
    what is running; the lane ID lets them match it to the plan and stop the right one.
 2. **A dead lane becomes visible as an absence with a name attached** (§5). Reconciling
-   "surfaces I dispatched" against "surfaces alive" is far easier when both sides read `WT-6`
+   "surfaces I dispatched" against "surfaces alive" is far easier when both sides read `A2`
    instead of `432`.
 3. **Renumbering stops mattering.** The name survives; the number does not.
 

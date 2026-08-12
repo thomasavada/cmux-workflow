@@ -46,17 +46,17 @@ prints only `pane:281`. Fix it in the same breath:
 
 ```bash
 cmux new-split right                                     # → OK surface:431 workspace:5
-cmux rename-tab --surface surface:431 "WT-5 dimensions"  # → OK action=rename tab=tab:431
+cmux rename-tab --surface surface:431 "A1 auth-refactor"  # → OK action=rename tab=tab:431
 ```
 
 Then the layout reads itself:
 
 ```
---- pane:281 ---   * surface:431  WT-5 dimensions
---- pane:282 ---   * surface:432  WT-6 partitions
+--- pane:281 ---   * surface:431  A1 auth-refactor
+--- pane:282 ---   * surface:432  A2 rate-limit
 ```
 
-**Name with the lane ID from the brief** (`WT-5 dimensions`, `WC2 cascade`), never a description —
+**Name with the lane ID from the brief** (`A1 auth-refactor`, `A2 rate-limit`), never a description —
 the ID is what the plan file, the dispatch string and the commit message all use, and a prettier
 name breaks that chain.
 
@@ -100,7 +100,7 @@ mid-task; its file edits remain on disk but its reasoning does not.
 cmux new-split right                                    # → surface:A
 cmux rename-tab --surface surface:A "W0-A classification"
 cmux new-split right                                    # → surface:B
-cmux rename-tab --surface surface:B "W0-B visibility"
+cmux rename-tab --surface surface:B "B7 cache-layer"
 
 # split each column downward instead of adding a third column
 cmux new-split down --surface surface:A                 # → surface:C
