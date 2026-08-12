@@ -743,8 +743,18 @@ it from outside, so "sent it, saw no error" gets misread as "it ran". A probe mu
 
 ### 5.1 · What state is every lane in? — start here
 
+⚠️ `${CLAUDE_PLUGIN_ROOT}` is NOT set in the Bash tool environment — only for hook commands.
+Resolve it first or the path collapses to `/skills/…` and the script "does not exist"
+*(measured on a real install, 2026-08-13)*:
+
 ```bash
-${CLAUDE_PLUGIN_ROOT}/skills/cmux-orchestration/lane-status.sh --all      # or: /cmux-workflow:lanes
+ROOT="${CLAUDE_PLUGIN_ROOT:-}"
+[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/cache/*/cmux-workflow/*/ 2>/dev/null | sort -V | tail -1)"
+[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/marketplaces/*cmux-workflow 2>/dev/null | tail -1)"
+```
+
+```bash
+"$ROOT"/skills/cmux-orchestration/lane-status.sh --all      # or: /cmux-workflow:lanes
 ```
 
 **Run this before anything else in §5**, and always when picking up a session whose lanes you
@@ -771,8 +781,8 @@ entry at all, or one you suspect never received its brief.
 **The method: make the shell prove it is listening.**
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/skills/cmux-orchestration/lane-health.sh          # every pane
-${CLAUDE_PLUGIN_ROOT}/skills/cmux-orchestration/lane-health.sh 169 170  # specific surfaces
+"$ROOT"/skills/cmux-orchestration/lane-health.sh          # every pane
+"$ROOT"/skills/cmux-orchestration/lane-health.sh 169 170  # specific surfaces
 ```
 
 The script sends `touch <temp file>` into each pane and checks whether the file appears.
@@ -902,7 +912,7 @@ re-invokes you when it exits and nothing else will.
 
 ```bash
 # Bash(run_in_background: true) — arm it the moment the lane is dispatched
-${CLAUDE_PLUGIN_ROOT}/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60
+"$ROOT"/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60
 ```
 
 It waits on `agentLifecycle: idle` in cmux's own turn-hook session store, compared against a

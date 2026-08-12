@@ -101,10 +101,20 @@ and the field that ends the guessing — **`agentLifecycle`: `running` · `idle`
 `unknown`**. `idle` means **the turn ended**, written by the agent's own Stop hook. It is a
 recorded fact, it costs one file read, and it is per-surface.
 
+⚠️ `${CLAUDE_PLUGIN_ROOT}` is NOT set in the Bash tool environment — only for hook commands.
+Resolve it first or the path collapses to `/skills/…` and the script "does not exist"
+*(measured on a real install, 2026-08-13)*:
+
+```bash
+ROOT="${CLAUDE_PLUGIN_ROOT:-}"
+[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/cache/*/cmux-workflow/*/ 2>/dev/null | sort -V | tail -1)"
+[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/marketplaces/*cmux-workflow 2>/dev/null | tail -1)"
+```
+
 ```bash
 # both scripts live in the cmux-orchestration skill
-${CLAUDE_PLUGIN_ROOT}/skills/cmux-orchestration/lane-status.sh --all                      # one-shot: which lanes are RUNNING / DONE / BLOCKED / DEAD
-${CLAUDE_PLUGIN_ROOT}/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60    # Bash(run_in_background: true) — exits when they end
+"$ROOT"/skills/cmux-orchestration/lane-status.sh --all                      # one-shot: which lanes are RUNNING / DONE / BLOCKED / DEAD
+"$ROOT"/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60    # Bash(run_in_background: true) — exits when they end
 ```
 
 ⚠️ **Compare `updatedAt` against a baseline, never test `idle` for presence.** The store
