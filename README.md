@@ -20,6 +20,7 @@ simply no mechanism that would tell you, and a lane will never remind you.
 | `cmux-workflow:orchestration-loop` | The watcher mechanism — why the foreground poll you reach for first is blocked, and what condition actually means *done* |
 | `cmux-workflow:cmux-screen-layout` | Where the panes go, so four lanes stay readable instead of becoming four unreadable columns |
 | `/cmux-workflow:lanes` | One command: the state of every lane right now, and what to verify, commit or close |
+| `/cmux-workflow:demo` | A live guided walkthrough — sidebar, groups, status lanes, four agents at once, then a clean teardown |
 
 Two scripts do the work, and **neither one sends a keystroke into a pane**:
 
