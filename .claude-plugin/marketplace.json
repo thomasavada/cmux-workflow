@@ -1,0 +1,27 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "thomasavada-cmux-workflow",
+  "owner": {
+    "name": "thomasavada",
+    "url": "https://github.com/thomasavada"
+  },
+  "metadata": {
+    "description": "cmux-workflow: dispatch parallel coding agents as cmux panes, and know the moment each one finishes.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "cmux-workflow",
+      "source": "./",
+      "description": "Run parallel coding agents as cmux panes and actually know when they finish. Dispatch codex/grok lanes with briefs that survive, watch them via cmux's own turn-hook session store (`agentLifecycle: idle` — a recorded fact, not a `pgrep` guess), audit lanes you forgot to watch, and clean them up safely. Ships `/cmux-workflow:lanes` plus `lane-status.sh` and `lane-watch.sh`.",
+      "version": "0.1.0",
+      "author": {
+        "name": "thomasavada",
+        "url": "https://github.com/thomasavada"
+      },
+      "homepage": "https://github.com/thomasavada/cmux-workflow",
+      "repository": "https://github.com/thomasavada/cmux-workflow",
+      "license": "MIT"
+    }
+  ]
+}

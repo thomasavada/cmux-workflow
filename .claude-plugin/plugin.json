@@ -1,0 +1,24 @@
+{
+  "name": "cmux-workflow",
+  "version": "0.1.0",
+  "description": "Run parallel coding agents as cmux panes and actually know when they finish. Three skills and one command for dispatching codex/grok lanes, watching them with a signal that cannot lie (cmux's own turn-hook session store, not `pgrep`), auditing lanes you forgot to watch, and cleaning them up. Every rule in here comes from a measured failure in a real session, not from theory.",
+  "author": {
+    "name": "thomasavada",
+    "url": "https://github.com/thomasavada"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/thomasavada/cmux-workflow",
+  "repository": "https://github.com/thomasavada/cmux-workflow",
+  "keywords": [
+    "cmux",
+    "codex",
+    "grok",
+    "orchestration",
+    "parallel-agents",
+    "multi-agent",
+    "worktree",
+    "lanes",
+    "background-tasks",
+    "agent-monitoring"
+  ]
+}
