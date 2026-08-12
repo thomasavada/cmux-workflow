@@ -500,7 +500,17 @@ Three reasons this earns its one line:
 3. **Renumbering stops mattering.** The name survives; the number does not.
 
 ⚠️ `rename-tab` takes `--surface` and renames the **tab** that owns it (`tab=tab:431`). That is the
-correct call — there is no `rename-surface`. `tab-action --action rename --title <text>` is the
+correct call — there is no `rename-surface`.
+
+🔴 **Renaming a pane in ANOTHER workspace needs `--workspace` too, or it fails `not_found: Tab
+not found`** *(measured 2026-08-13)*. `--surface` alone is resolved within the caller's own
+workspace, so the moment you `new-split --workspace workspace:N` you must carry that flag through
+to the rename — and to `send`, `send-key` and `read-screen` for the same surface:
+
+```bash
+cmux new-split right --workspace workspace:39                       # → OK surface:455
+cmux rename-tab --workspace workspace:39 --surface surface:455 "DEMO-1"
+``` `tab-action --action rename --title <text>` is the
 longer equivalent if you ever need the other flags.
 
 ### 5.0 · Five steps to open a lane — in this exact order

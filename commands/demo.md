@@ -68,9 +68,13 @@ Point out the sidebar entry. This is what §1.1a makes you close **before** dele
 ## 4 · A named pane
 
 ```bash
-cmux new-split right          # → note the surface ref it prints, e.g. surface:512
-cmux rename-tab --surface surface:<N> "DEMO-1 hello"
+cmux new-split right --workspace workspace:<W>       # → note the surface ref it prints
+cmux rename-tab --workspace workspace:<W> --surface surface:<N> "DEMO-1 hello"
 ```
+
+🔴 **Carry `--workspace` on every call to a surface outside the caller's workspace** — rename,
+send, send-key, read-screen. Without it the rename answers `not_found: Tab not found`, because
+`--surface` is resolved inside the caller's own workspace *(measured 2026-08-13)*.
 
 *Why the name:* `new-split` has no name flag and surface refs get renumbered. With three panes
 open, an unnamed one is a number you have to keep in your head.
@@ -78,8 +82,8 @@ open, an unnamed one is a number you have to keep in your head.
 ## 5 · Probe — make the shell prove it is listening
 
 ```bash
-cmux send --surface surface:<N> "touch $WT/.demo-probe"
-cmux send-key --surface surface:<N> Enter
+cmux send --workspace workspace:<W> --surface surface:<N> "touch $WT/.demo-probe"
+cmux send-key --workspace workspace:<W> --surface surface:<N> Enter
 sleep 1; ls "$WT/.demo-probe"          # the file MUST appear
 ```
 
@@ -93,8 +97,8 @@ Write `$WT/BRIEF-demo.md` with a task small enough to finish in a minute — e.g
 sentence that a lane in a worktree **cannot commit** and must not try.
 
 ```bash
-cmux send --surface surface:<N> 'codex -s workspace-write -a never --strict-config -m gpt-5.6-sol -c model_reasoning_effort=low "Lane DEMO-1. Read BRIEF-demo.md and follow it."'
-cmux send-key --surface surface:<N> Enter
+cmux send --workspace workspace:<W> --surface surface:<N> 'codex -s workspace-write -a never --strict-config -m gpt-5.6-sol -c model_reasoning_effort=low "Lane DEMO-1. Read BRIEF-demo.md and follow it."'
+cmux send-key --workspace workspace:<W> --surface surface:<N> Enter
 sleep 3; pgrep -x codex | wc -l        # MUST be baseline + 1
 ```
 
@@ -104,7 +108,7 @@ watching, and looks exactly like a lane that is thinking.
 ## 7 · Read the screen
 
 ```bash
-cmux read-screen --surface surface:<N> --lines 20
+cmux read-screen --workspace workspace:<W> --surface surface:<N> --lines 20
 ```
 
 *Why:* a live process is not a working lane. A first run in a new worktree can sit on
@@ -124,7 +128,9 @@ ROOT="${CLAUDE_PLUGIN_ROOT}"
 bash "$ROOT/skills/cmux-orchestration/lane-status.sh" --all
 ```
 
-Read the output aloud: the demo lane is `RUNNING` and flagged **no watcher**. Point at the
+Read the output aloud: the demo lane is `RUNNING` and flagged **no watcher**. A one-file task can
+finish before you get here — if it already says `DONE`, say so and skip step 10 rather than
+pretending to watch something that has stopped. Point at the
 `claude` rows and say those are never closed by this tool.
 
 ## 10 · Arm the watcher
@@ -173,13 +179,20 @@ Harvest first, then remove:
 ```bash
 cat "$WT/hello-from-lane.md"               # this is what --force would have destroyed
 git worktree remove --force "$WT"          # only now, and only because we read it first
-git branch -D chore/cmux-demo              # -D because nothing was merged
+git branch -d chore/cmux-demo              # plain -d: see below
 git worktree prune
-cmux close-surface --surface surface:<N>
 ```
 
-Note that `git branch -d` refuses an unmerged branch too, and that removing a worktree never
-deletes its branch.
+⚠️ **`-d` succeeds here, and the reason is worth saying out loud:** the lane could not commit, so
+the branch is still exactly at its base and git considers it merged. The safety net you would
+meet on a real feature branch — `error: the branch is not fully merged` — does **not** fire in
+this demo. Say so, rather than letting the user conclude `-d` is always safe.
+
+⚠️ **Do not close the lane's surface afterwards.** `cmux close-workspace` already took it with
+the workspace, and `cmux close-surface --surface <N>` then answers `Surface ref not found`.
+Closing the workspace is the single teardown step.
+
+Removing a worktree never deletes its branch — that is why the branch line exists at all.
 
 ## 13 · Verify nothing was left behind
 
