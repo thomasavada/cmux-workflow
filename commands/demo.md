@@ -84,42 +84,81 @@ open, an unnamed one is a number you have to keep in your head.
 ```bash
 cmux send --workspace workspace:<W> --surface surface:<N> "touch $WT/.demo-probe"
 cmux send-key --workspace workspace:<W> --surface surface:<N> Enter
-sleep 1; ls "$WT/.demo-probe"          # the file MUST appear
+sleep 4; ls "$WT/.demo-probe"          # the file MUST appear
 ```
 
 *Why:* `cmux send` types **keystrokes** and returns `OK` even when nothing reads them. A probe
 must leave a trace on disk; `pwd` is worthless because its output stays inside the pane.
 
-## 6 · Write the brief, then dispatch
+⚠️ **Give the shell time to start, or you get a FALSE negative** *(measured 2026-08-13)*: a probe
+checked ~2s after `new-split` reported failure while the screen showed the command had run — the
+shell was still printing `Last login`. The skill's advice for a failed probe is "close the pane
+and recreate it", which would have thrown away a perfectly healthy pane. Wait ~4s, and if it
+fails, **read the screen before concluding anything**.
 
-Write `$WT/BRIEF-demo.md` with a task small enough to finish in a minute — e.g. *create
-`hello-from-lane.md` containing one sentence, then report the file list and stop.* Include the
-sentence that a lane in a worktree **cannot commit** and must not try.
+## 6 · Four lanes, four different jobs
+
+One lane proves the plumbing. **Four lanes show what the plumbing is for** — so give each one a
+different shape, and let the audience watch them finish at different times.
+
+| Lane | Agent | Why this one is in the demo |
+|---|---|---|
+| `DEMO-1 hello` | codex, `--effort low` | the fastest possible lane. Finishes in seconds, so the first `DONE` lands while you are still talking |
+| `DEMO-2 review` | **claude, `--model sonnet`** | proves a lane is not "a codex thing". Opus orchestrates, Sonnet does the work |
+| `DEMO-3 security` | codex, `--effort xhigh`, read-only | effort chosen by **blast radius**, not by how hard the task feels |
+| `DEMO-4 implement` | codex in the **worktree** | the only one that writes code — and the one that cannot commit |
+
+Write each brief as a file first; never stuff it into the `send` string, which types through a
+simulated keyboard. Keep every brief to one small deliverable and end each with *"report the file
+list, then stop."*
+
+**Dispatch pattern — identical for all four, except the agent line:**
 
 ```bash
-cmux send --workspace workspace:<W> --surface surface:<N> 'codex -s workspace-write -a never --strict-config -m gpt-5.6-sol -c model_reasoning_effort=low "Lane DEMO-1. Read BRIEF-demo.md and follow it."'
+cmux new-split right --workspace workspace:<W>
+cmux rename-tab --workspace workspace:<W> --surface surface:<N> "DEMO-2 review"
+sleep 4                                        # let the shell finish starting — see §5 below
+cmux send     --workspace workspace:<W> --surface surface:<N> "<the agent command>"
 cmux send-key --workspace workspace:<W> --surface surface:<N> Enter
-sleep 3; pgrep -x codex | wc -l        # MUST be baseline + 1
 ```
 
-*Why `-a never`:* without it codex stops at the first approval prompt in a pane nobody is
-watching, and looks exactly like a lane that is thinking.
+The two agent lines, and the flag that matters in each:
 
-## 7 · Read the screen
+```bash
+# codex — -a never is what stops it halting on an approval nobody is watching
+codex -s workspace-write -a never --strict-config -m gpt-5.6-sol -c model_reasoning_effort=low "Lane DEMO-1. Read BRIEF-1.md and follow it."
+
+# claude — --permission-mode acceptEdits is NOT the equivalent: it auto-accepts EDITS but still
+# stops for every Bash command. Measured 2026-08-13: the lane sat on "Do you want to proceed?"
+claude --model sonnet --permission-mode bypassPermissions "Lane DEMO-2. Read BRIEF-2.md and follow it."
+```
+
+🔴 **Say that codex/Claude difference out loud.** It is the single most useful thing an audience
+takes away from this section, and it is invisible until a lane hangs.
+
+⚠️ **Cost is real, and Claude lanes bill against the same weekly quota as the chat driving them.**
+Check before you run four lanes in front of people; the Claude TUI footer prints the percentage
+used. Cut to two lanes (`hello` + `review`) if the budget is tight — the lesson survives.
+
+## 7 · Read every screen
 
 ```bash
 cmux read-screen --workspace workspace:<W> --surface surface:<N> --lines 20
 ```
 
 *Why:* a live process is not a working lane. A first run in a new worktree can sit on
-`Do you trust the contents of this directory?`, which `-a never` does not suppress. Send `Enter`
-if you see it.
+`Do you trust the contents of this directory?`, which `-a never` does not suppress.
 
-## 8 · A Claude teammate, in parallel
+## 8 · Pin the workspace while they run
 
-Spawn one with the `Agent` tool, `run_in_background: true`, model `sonnet`, with a small
-read-only question about the repo. Say why this is a teammate and not a lane: judgment and prose,
-no file boundaries.
+```bash
+cmux workspace-action --action pin       --workspace workspace:<W>
+cmux workspace-action --action set-color --workspace workspace:<W> --color "#4C8DFF"
+```
+
+*Why here:* with four lanes running, this is the row you keep coming back to. Pinning holds it at
+the top of the rail while everything else moves around it. It also sets up the teardown lesson in
+§12, because **a pinned workspace refuses to close**.
 
 ## 9 · The state of everything
 
@@ -160,11 +199,14 @@ sits outside the sandbox's writable root. The work is on disk and nowhere else.
 ## 12 · Teardown — and let it refuse
 
 ```bash
+cmux workspace-action --action unpin --workspace <ref>   # §8 pinned it — this is REQUIRED
 cmux close-workspace --workspace <ref>     # workspace first, or it lingers pointing at nothing
 git worktree remove "$WT"                  # EXPECT THIS TO REFUSE
 ```
 
-**It will refuse**, because the lane left untracked files. Show the error verbatim:
+**Two refusals, back to back, and both are guards.** A pinned workspace answers
+`protected: Pinned workspaces can't be closed while pinned` — cmux will not let you close your
+home by accident. Then `git worktree remove` **refuses** because the lane left untracked files. Show the error verbatim:
 
 ```
 fatal: '<path>' contains modified or untracked files, use --force to delete it

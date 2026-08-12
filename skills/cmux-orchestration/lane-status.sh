@@ -135,6 +135,14 @@ for path in glob.glob(os.path.expanduser("~/.cmuxterm/*-hook-sessions.json")):
         # 311 historical sessions accumulate against reused surfaces — keep only the newest.
         if prev is None or (e.get("updatedAt") or 0) > (prev.get("updatedAt") or 0):
             e = dict(e); e["_agent"] = agent
+            # Claude can be EITHER the orchestrating chat or a dispatched lane, and the two need
+            # opposite treatment: never close the first, close the second once verified. The
+            # store records the sanitized argv, and a dispatched lane is the one that was
+            # launched with its model and permission mode pinned (measured 2026-08-13):
+            #   orchestrator : claude --dangerously-skip-permissions
+            #   lane         : claude --model sonnet --permission-mode bypassPermissions
+            args = " ".join(str(a) for a in ((e.get("launchCommand") or {}).get("arguments") or []))
+            e["_dispatched"] = ("--model" in args) or ("--permission-mode" in args)
             store[sid] = e
 
 def pid_alive(pid):
@@ -155,6 +163,8 @@ out = []
 for r in rows:
     e     = store.get(r["uuid"]) or {}
     kind  = e.get("_agent") or "shell"
+    if kind == "claude" and e.get("_dispatched"):
+        kind = "claude*"          # * = dispatched as a lane, so it IS closeable once verified
     life  = (e.get("agentLifecycle") or e.get("runtimeStatus") or "").lower()
     alive = pid_alive(e.get("pid"))
     upd   = e.get("updatedAt")
@@ -162,7 +172,18 @@ for r in rows:
     if not e:
         state, why = "EMPTY", "no session ever recorded — pane is sitting at a shell"
     elif life == "needsinput":
-        state, why = "BLOCKED", f"agent is waiting for an answer ({ago(upd)})"
+        # 🔴 codex and Claude END A TURN DIFFERENTLY, and taking `needsInput` at face value
+        # mislabels every finished Claude lane as blocked (measured 2026-08-13):
+        #   codex  finishes → `idle`
+        #   Claude finishes → `needsInput`, because its TUI is now sitting at an empty prompt
+        # `lastSubtitle` separates the two cases: "Waiting" = the turn ended and it wants your
+        # next message; "Permission" = it genuinely cannot proceed without an answer.
+        sub = (e.get("lastSubtitle") or "").lower()
+        if sub.startswith("waiting"):
+            state, why = "DONE", f"turn ended {ago(upd)} · sitting at its prompt"
+        else:
+            hint = f" · {e.get('lastSubtitle')}" if e.get("lastSubtitle") else ""
+            state, why = "BLOCKED", f"agent is waiting for an answer ({ago(upd)}){hint}"
     elif life == "running":
         # `running` plus a dead pid is the crash case, and the one that costs work: nothing
         # ever writes `idle` for a process that was killed, so this entry would read RUNNING
@@ -198,8 +219,10 @@ if git_lines:
     for l in git_lines[:8]: print(f'       {l}')
     if len(git_lines) > 8:  print(f'       … +{len(git_lines)-8} more')
 
-# `claude` surfaces are excluded from every disposal suggestion: they are the orchestrating
+# Bare `claude` surfaces are excluded from every disposal suggestion: they are the orchestrating
 # chat or a teammate, and closing one throws away everything it has read. Idle is not done.
+# `claude*` — launched with --model/--permission-mode — was dispatched as a lane and is treated
+# like any other lane.
 #
 # Two more exclusions, both learned by watching --all produce dangerous advice:
 #   · EMPTY means no session was ever recorded on that surface — it is a plain shell, not a
