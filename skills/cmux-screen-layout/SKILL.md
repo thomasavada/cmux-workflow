@@ -35,6 +35,13 @@ once" — it is "how many does the person actually need to glance at."
 | **5+** | **tabs**: one or two panes, extra lanes as `new-surface --pane` | past four, splitting makes every lane useless; tab them and switch |
 | different project | `cmux new-workspace --name "<slug>"` | it has its own name flag, unlike `new-split` |
 
+⚠️ **UNVERIFIED — the grid recipe above needs a human eye.** `cmux new-split down --surface <s>`
+was expected to split *inside* that surface's column; on 2026-08-13 it added another **flat** pane
+instead, and `cmux tree` prints every pane at the same level either way, so the CLI alone cannot
+tell you whether you got a grid or another column. Until someone confirms it against the actual
+screen: **open two panes, look at them, and only then decide whether a third is readable.** If it
+is not, use tabs (`new-surface --pane`) rather than trusting this table.
+
 ⚠️ **Never split more than twice in the same direction.** Three `new-split right` in a row gives
 three narrow columns; the third is already too tight for codex's box drawing, and you will misread
 its state — which is how a finished lane gets reported as running.

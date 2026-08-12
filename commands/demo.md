@@ -22,6 +22,26 @@ git rev-parse --show-toplevel                      # must be inside a git repo
 No cmux, no codex, or no session store ⇒ **stop and say which one is missing.** A demo that
 half-runs teaches the wrong thing.
 
+## Load the skills first — this file does not restate them
+
+This command is a **script for a demo**, not a second copy of the rules. Before step 1, load:
+
+| Skill | What it owns here |
+|---|---|
+| `cmux-workflow:cmux-screen-layout` | **where the panes go.** Read it BEFORE the second pane |
+| `cmux-workflow:cmux-orchestration` | §5.0 the five dispatch steps · §2 what a brief needs · §1.1a teardown |
+| `cmux-workflow:orchestration-loop` | why a background watcher is the only mechanism that notifies you |
+
+🔴 **The layout skill is not optional garnish — skipping it is how this demo failed on its first
+real run** *(2026-08-13)*. Four lanes were opened with `new-split right` four times, which is the
+exact anti-pattern that skill opens with: the result was five columns roughly 40 characters wide,
+codex's box drawing wrapped into soup, and nothing on screen could be read — by the presenter or
+the audience. The lanes were all working perfectly. **A demo nobody can read is a failed demo**,
+and the fix costs one command.
+
+Follow that skill's rule for the lane count you are actually running, and if the panes still come
+out unreadable, **stop and fix the layout before dispatching anything else.** Do not push on.
+
 ## Ground rules while running it
 
 - **Narrate the WHY, one or two sentences per step.** Every step below exists because something
@@ -112,10 +132,12 @@ Write each brief as a file first; never stuff it into the `send` string, which t
 simulated keyboard. Keep every brief to one small deliverable and end each with *"report the file
 list, then stop."*
 
-**Dispatch pattern — identical for all four, except the agent line:**
+**Dispatch pattern — identical for all four, except the agent line.** Take the split direction
+from `cmux-screen-layout`, not from this file; with four lanes it is **not** four `new-split
+right`:
 
 ```bash
-cmux new-split right --workspace workspace:<W>
+cmux new-split <direction per the layout skill> --workspace workspace:<W>
 cmux rename-tab --workspace workspace:<W> --surface surface:<N> "DEMO-2 review"
 sleep 4                                        # let the shell finish starting — see §5 below
 cmux send     --workspace workspace:<W> --surface surface:<N> "<the agent command>"
