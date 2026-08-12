@@ -58,8 +58,41 @@ WORKTREE_ROOT="$HOME/cmux/worktrees/$(basename "$(git rev-parse --show-toplevel)
 mkdir -p "$WORKTREE_ROOT"
 git worktree add "$WORKTREE_ROOT/<slug>" -b <type>/<slug>   # feature/ bugfix/ chore/ improve/
 cd "$WORKTREE_ROOT/<slug>" && <your project's worktree setup>   # ← NOT optional, see below
-cmux new-workspace --name "<type>/<slug>" --cwd "$WORKTREE_ROOT/<slug>" --focus true
+cmux workspace create --name "<type>/<slug>" --cwd "$WORKTREE_ROOT/<slug>" \
+  --group "$(caller_group)" --focus true          # ← see below; NOT top level
 ```
+
+🔴 **A workspace you create for a lane belongs in the caller's group, not at the top of the
+rail.** The sidebar is a queue ordered by importance; dropping a lane workspace at top level puts
+throwaway work above the projects someone actually pinned. `cmux identify` does **not** report the
+caller's group, so resolve it by membership:
+
+```bash
+caller_group() {
+  local ws; ws="$(cmux identify --json | python3 -c 'import json,sys;print((json.load(sys.stdin).get("caller") or {}).get("workspace_ref") or "")')"
+  cmux workspace-group list --json | python3 -c '
+import json,sys
+ws = sys.argv[1]
+for g in json.load(sys.stdin):
+    if isinstance(g, dict) and ws in (g.get("member_workspace_refs") or []):
+        print(g["ref"]); break' "$ws"
+}
+```
+
+Empty output means the caller is not in a group — then create the workspace without `--group` and
+leave it where it lands. Do not invent a group for someone who does not use them.
+
+⚠️ **`workspace-group create` costs one extra workspace.** Each group is owned by an **anchor**
+workspace and the group header *is* that anchor's row, so creating a group also creates a
+workspace to anchor it *(measured 2026-08-13)*. Reuse an existing group when one fits; create a
+new one only for work that will be thrown away as a unit.
+
+Two more behaviours worth knowing before you rely on groups:
+
+| | |
+|---|---|
+| Closing the **anchor** | closes only that workspace; the next member is promoted and the group survives |
+| `workspace-group delete <g> --close-workspaces` | dissolves the group **and closes every member** — the one-command teardown, and explicitly destructive |
 
 🔴 **A fresh worktree looks like the repo and cannot run it.** `git worktree add` gives you
 exactly the tracked files and nothing else — and the things it leaves out are precisely the ones

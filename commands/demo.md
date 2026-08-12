@@ -77,13 +77,22 @@ same config several times. One CLI refused to start over exactly that (§1.1).
 Say plainly that a real worktree would now need the project's setup step — gitignored config,
 `node_modules`, build output — and that this demo skips it because the lane only writes one file.
 
-## 3 · A workspace for it
+## 3 · A group, then a workspace inside it
+
+Everything this demo creates goes in **one throwaway group**, so nothing lands at the top of the
+user's rail and teardown is a single command:
 
 ```bash
-cmux new-workspace --name "cmux-demo" --cwd "$WT" --focus false
+G=$(cmux workspace-group create --name "demo" | grep -o 'workspace_group:[0-9]*')
+cmux workspace create --name "cmux-demo" --cwd "$WT" --group "$G" --focus false
 ```
 
-Point out the sidebar entry. This is what §1.1a makes you close **before** deleting the directory.
+*Why a group of its own rather than the caller's group:* a demo is disposable as a unit. Real lane
+work inherits the caller's group instead — that rule, and the resolver for it, live in
+`cmux-orchestration` §1.1.
+
+⚠️ Creating a group also creates an **anchor** workspace to own it, so expect one more row than
+you made. Point at the collapsible group header: that is the demo, contained.
 
 ## 4 · A named pane
 
@@ -222,8 +231,8 @@ sits outside the sandbox's writable root. The work is on disk and nowhere else.
 
 ```bash
 cmux workspace-action --action unpin --workspace <ref>   # §8 pinned it — this is REQUIRED
-cmux close-workspace --workspace <ref>     # workspace first, or it lingers pointing at nothing
-git worktree remove "$WT"                  # EXPECT THIS TO REFUSE
+cmux workspace-group delete "$G" --close-workspaces      # the group AND every member, one command
+git worktree remove "$WT"                                # EXPECT THIS TO REFUSE
 ```
 
 **Two refusals, back to back, and both are guards.** A pinned workspace answers

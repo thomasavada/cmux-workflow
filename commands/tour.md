@@ -53,9 +53,13 @@ Do not fix anything yet. The rest of the tour is the fix.
 Create two throwaway workspaces so there is something to organise:
 
 ```bash
-cmux workspace create --name "tour-main" --focus false      # new-workspace is the old alias
-cmux workspace create --name "tour-scratch" --focus false
+G=$(cmux workspace-group create --name "tour" | grep -o 'workspace_group:[0-9]*')
+cmux workspace create --name "tour-main"    --group "$G" --focus false
+cmux workspace create --name "tour-scratch" --group "$G" --focus false
 ```
+
+*Already a lesson:* the rail nests. A **group** is the collapsible header; everything this tour
+makes lives under it, so it never mixes with their real work — and teardown is one command.
 
 Then three moves, each one visible instantly in the rail:
 
@@ -173,7 +177,7 @@ Then close what the tour made:
 
 ```bash
 cmux workspace-action --action unpin --workspace <ref>   # REQUIRED if you pinned it in Act 1
-cmux close-workspace --workspace <ref>
+cmux workspace-group delete "$G" --close-workspaces      # group + every member it created
 ```
 
 🔴 **A pinned workspace refuses to close** *(measured 2026-08-13)*:
