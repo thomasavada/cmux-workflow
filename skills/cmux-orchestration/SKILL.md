@@ -136,6 +136,51 @@ cmux send-key --surface surface:N Enter           # if stuck at the prompt (opti
 
 **A live process ≠ a lane making progress.** No signal from `ps` distinguishes the two.
 
+### 1.1a · Tearing one down — merge, then remove, in this order
+
+A worktree that outlives its feature is not free: it holds a checkout, a `node_modules`, a cmux
+workspace in the sidebar, and a branch you will later fail to recognise. Clean up as soon as the
+branch is merged — but in an order that cannot destroy work.
+
+```bash
+# 1 · Is anything uncommitted? A worktree lane CANNOT COMMIT (see §2 rule three), so the
+#     answer here is "yes" far more often than in your main checkout.
+git -C "$WT" status --porcelain          # MUST be empty before anything below
+
+# 2 · Is anything unpushed? Local commits die with the branch.
+git -C "$WT" log --oneline @{upstream}.. 2>/dev/null || git -C "$WT" log --oneline main..
+
+# 3 · Nothing still running from inside it? A server whose cwd is deleted keeps its port.
+lsof -a -d cwd -- "$WT" 2>/dev/null | tail -n +2
+
+# 4 · Only now
+cmux close-workspace --workspace <ref>   # the workspace outlives the directory otherwise
+git worktree remove "$WT"                # refuses if 1 was not clean — that is the safety net
+git branch -d <branch>                   # refuses if not merged — also a safety net
+git worktree prune                       # clears stale admin entries
+```
+
+Four behaviours, measured rather than assumed — and each one is the reason a step exists:
+
+| Command | What it actually does |
+|---|---|
+| `git worktree remove` | **refuses on modified *or untracked* files.** Untracked alone is enough. `--force` deletes them permanently |
+| `rm -rf <worktree>` | git still lists the entry, marked `prunable`. `git worktree prune` clears it |
+| removing a worktree | does **not** delete the branch. It stays, and later looks like someone else's |
+| `git branch -d` | **refuses an unmerged branch** and suggests `-D`. Take the refusal as information |
+
+🔴 **`--force` and `-D` are the two commands that turn cleanup into data loss** — and a worktree
+is exactly where that hurts most, because a codex lane running in one **cannot commit at all**,
+so everything it produced is sitting in the working tree by design. Reaching for `--force`
+because "remove refused" is reaching past the guard that just told you the work is still there.
+
+**If `remove` refuses, that is the whole message.** Go read what is uncommitted, harvest it —
+commit it from the main checkout, or copy the files out — and only then remove.
+
+⚠️ **Close the cmux workspace before deleting the directory**, not after. A workspace whose
+`--cwd` no longer exists still appears in the sidebar, and its panes open in a directory that is
+gone; you then have to identify it by elimination among workspaces that all look alike.
+
 ### 1.2 · The plan is the artifact; the dispatch is not
 
 **`docs/plans/<slug>.md` is the brief**, and it is committed. Write it to be complete enough
