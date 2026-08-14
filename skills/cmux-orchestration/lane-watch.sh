@@ -79,45 +79,72 @@ for sid in want:
 PY
 probe() { python3 -c "$PROBE" "$@"; }
 
-declare -a PAIRS=(); declare -A BASE=()
+# Parallel indexed arrays and a linear scan, not associative arrays. macOS still ships bash 3.2 at
+# /bin/bash, and there `declare -A` fails WITHOUT stopping the script: it prints `declare: -A:
+# invalid option`, leaves an ordinary indexed array behind, and execution continues. The surface
+# UUID then lands in `BASE[$sid]` as an indexed subscript, which bash evaluates as arithmetic —
+# `FE1D186C-BBDD-4EF1-…` becomes a subtraction of unset names and dies under `set -u` with
+# `FE1D186C: unbound variable`. Measured 2026-08-14: the watcher exits about a second after it is
+# armed, having watched nothing, and its exit is the very wake-up the orchestrator was relying on.
+# At three or four lanes a linear scan costs nothing, and this runs on the bash already present.
+REFS=(); UUIDS=()
 for t in "${TARGETS[@]}"; do
   u="$(echo "$MAP" | awk -v r="$t" '$1==r{print $2}')"
   [ -z "$u" ] && { echo "surface:$t does not exist — skipping"; continue; }
-  PAIRS+=("$t:$u")
+  REFS+=("$t"); UUIDS+=("$u")
 done
-[ ${#PAIRS[@]} -eq 0 ] && { echo "no valid lane to watch"; exit 1; }
+N=${#REFS[@]}
+[ "$N" -eq 0 ] && { echo "no valid lane to watch"; exit 1; }
 
-UUIDS=(); for p in "${PAIRS[@]}"; do UUIDS+=("${p#*:}"); done
-while read -r sid life upd alive; do BASE[$sid]="$upd"; done < <(probe "${UUIDS[@]}")
-for p in "${PAIRS[@]}"; do
-  printf 'armed_baseline=%s pid=%s\n' "${BASE[${p#*:}]:-0}" "$$" > "$WATCH_DIR/surface-${p%%:*}.watch"
+IDX=-1
+find_idx() {                        # sets IDX to the slot holding surface uuid $1, or -1
+  local i=0; IDX=-1
+  while [ "$i" -lt "$N" ]; do
+    [ "${UUIDS[$i]}" = "$1" ] && { IDX="$i"; return; }
+    i=$((i+1))
+  done
+}
+
+BASES=(); STATES=(); i=0
+while [ "$i" -lt "$N" ]; do BASES[$i]=0; STATES[$i]=""; i=$((i+1)); done
+
+while read -r sid life upd alive; do
+  find_idx "$sid"; [ "$IDX" -ge 0 ] && BASES[$IDX]="$upd"
+done < <(probe "${UUIDS[@]}")
+
+i=0
+while [ "$i" -lt "$N" ]; do
+  printf 'armed_baseline=%s pid=%s\n' "${BASES[$i]}" "$$" > "$WATCH_DIR/surface-${REFS[$i]}.watch"
+  i=$((i+1))
 done
-cleanup() { for p in "${PAIRS[@]}"; do rm -f "$WATCH_DIR/surface-${p%%:*}.watch"; done; }
+cleanup() {
+  local i=0
+  while [ "$i" -lt "$N" ]; do rm -f "$WATCH_DIR/surface-${REFS[$i]}.watch"; i=$((i+1)); done
+}
 trap cleanup EXIT
 
-echo "WATCHING ${#PAIRS[@]} lane(s), timeout ${TIMEOUT_MIN}m:"
-for p in "${PAIRS[@]}"; do echo "  surface:${p%%:*}  (baseline updatedAt ${BASE[${p#*:}]:-0})"; done
+echo "WATCHING $N lane(s), timeout ${TIMEOUT_MIN}m:"
+i=0
+while [ "$i" -lt "$N" ]; do echo "  surface:${REFS[$i]}  (baseline updatedAt ${BASES[$i]})"; i=$((i+1)); done
 
-MAX=$(( TIMEOUT_MIN * 60 / POLL )); n=0
-declare -A FINISHED=()
-while [ "${#FINISHED[@]}" -lt "${#PAIRS[@]}" ] && [ "$n" -lt "$MAX" ]; do
+MAX=$(( TIMEOUT_MIN * 60 / POLL )); n=0; ENDED=0
+while [ "$ENDED" -lt "$N" ] && [ "$n" -lt "$MAX" ]; do
   sleep "$POLL"; n=$((n+1))
   while read -r sid life upd alive; do
-    ref=""; for p in "${PAIRS[@]}"; do [ "${p#*:}" = "$sid" ] && ref="${p%%:*}"; done
-    [ -z "$ref" ] && continue
-    [ -n "${FINISHED[$ref]:-}" ] && continue
-    base="${BASE[$sid]:-0}"
+    find_idx "$sid"; [ "$IDX" -lt 0 ] && continue
+    [ -n "${STATES[$IDX]}" ] && continue
+    ref="${REFS[$IDX]}"; base="${BASES[$IDX]}"
 
     if [ "$life" = "idle" ] && [ "$upd" -gt "$base" ]; then
-      FINISHED[$ref]="DONE"
+      STATES[$IDX]="DONE"; ENDED=$((ENDED+1))
       echo "surface:$ref  DONE  — turn ended (after ~$((n*POLL))s)"
       rm -f "$WATCH_DIR/surface-$ref.watch"
     elif [ "$life" = "needsinput" ] && [ "$upd" -gt "$base" ]; then
-      FINISHED[$ref]="BLOCKED"
+      STATES[$IDX]="BLOCKED"; ENDED=$((ENDED+1))
       echo "surface:$ref  BLOCKED — waiting for an answer, cannot get out on its own (after ~$((n*POLL))s)"
       rm -f "$WATCH_DIR/surface-$ref.watch"
     elif [ "$alive" = "0" ]; then
-      FINISHED[$ref]="GONE"
+      STATES[$IDX]="GONE"; ENDED=$((ENDED+1))
       echo "surface:$ref  GONE  — pid died without ever going idle ⇒ crashed mid-turn. Its work IS STILL ON DISK."
       rm -f "$WATCH_DIR/surface-$ref.watch"
     fi
@@ -125,11 +152,15 @@ while [ "${#FINISHED[@]}" -lt "${#PAIRS[@]}" ] && [ "$n" -lt "$MAX" ]; do
 done
 
 echo
-if [ "${#FINISHED[@]}" -lt "${#PAIRS[@]}" ]; then
+if [ "$ENDED" -lt "$N" ]; then
   echo "TIMEOUT after $((MAX*POLL))s — still running:"
-  for p in "${PAIRS[@]}"; do [ -z "${FINISHED[${p%%:*}]:-}" ] && echo "  surface:${p%%:*}"; done
+  i=0
+  while [ "$i" -lt "$N" ]; do
+    [ -z "${STATES[$i]}" ] && echo "  surface:${REFS[$i]}"
+    i=$((i+1))
+  done
   echo "TIMEOUT is a result, not a failure. Report it as exactly that."
 else
-  echo "ALL ${#PAIRS[@]} lane(s) have ended their turn."
+  echo "ALL $N lane(s) have ended their turn."
 fi
 echo "→ next: lane-status.sh  →  verify → run the gate → commit → close-surface"
