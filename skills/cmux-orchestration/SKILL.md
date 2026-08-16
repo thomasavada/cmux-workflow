@@ -1,6 +1,6 @@
 ---
 name: cmux-orchestration
-description: Pick the right tool for parallel work — cmux lane (codex/grok) vs Claude teammate vs a new worktree+workspace — then write the brief, open the lane, verify it, check whether it finished, and clean it up. Use when the user says "spawn lane", "split into lanes", "run this in parallel", "spawn teammate", "worktree for this feature", "isolate this task", or when a large job needs cutting up for several agents. Also use to AUDIT lanes already running — "are the lanes done", "did codex finish", "check the lanes", "which lanes are still open", "close the finished lanes", "clean up the panes" — via `lane-status.sh` (§5.1), the recovery path when no watcher was armed. Requires cmux — for pure Claude teammates see `agent-teams`.
+description: Pick the right tool for parallel work — cmux lane (codex/grok/claude) vs an in-host subagent vs a new worktree+workspace — then write the brief, open the lane, verify it, check whether it finished, and clean it up. Use when the user says "spawn lane", "split into lanes", "run this in parallel", "spawn teammate", "worktree for this feature", "isolate this task", or when a large job needs cutting up for several agents. Also use to AUDIT lanes already running — "are the lanes done", "did codex finish", "check the lanes", "which lanes are still open", "close the finished lanes", "clean up the panes" — via `lane-status.sh` (§5.1), the recovery path when no watcher was armed. Requires cmux — for pure Claude teammates see `agent-teams`.
 ---
 
 # Parallel work: lane, teammate, or workspace
@@ -8,14 +8,29 @@ description: Pick the right tool for parallel work — cmux lane (codex/grok) vs
 Distilled from one session running ~20 lanes and 5 teammates on a real codebase. Every rule
 here comes from a specific failure, not from theory.
 
+## 0 · Which host are you running in
+
+This skill installs into **Claude Code, codex and grok**, and every rule below about cmux, briefs,
+sandboxes and verification is identical in all three — a lane is a pane, and a pane does not care
+what dispatched it. Exactly three things differ, and each is called out where it matters:
+
+| | Claude Code | grok | codex |
+|---|---|---|---|
+| **Delegate in-host** (read → synthesise, no pane) | `Agent` | `spawn_subagent` | its own multi-agent fan-out |
+| **Get told when a watcher exits** | background Bash re-invokes you | background command notifies you | **nothing does** — §7 and `orchestration-loop` |
+| **Where this plugin's scripts live** | `~/.claude/plugins/…/<version>/` | `~/.grok/installed-plugins/<hash>/` — **no plugin name in the path** | `~/.codex/plugins/cache/…/<version>/` — §5.1 resolves all three |
+
+Wherever this skill says *teammate*, read it as **whatever your host's in-host delegate is**. If
+your host has none, the answer is another lane — that is the whole point of a pane.
+
 ## 1 · Picking the tool
 
 | Job | Tool | Why |
 |---|---|---|
 | Writing/editing code with clear file boundaries | **cmux lane + codex** | codex runs inside the repo, can commit, is cheap |
-| Read → synthesise → produce a document | **Claude teammate** (`Agent`) | needs judgment, web reading, prose |
-| Competitor survey, market research | **Claude teammate** | same |
-| Mapping a codebase, finding structural defects | **Claude teammate** | sees what file-by-file reading misses |
+| Read → synthesise → produce a document | **in-host subagent** (`Agent` · `spawn_subagent`) | needs judgment, web reading, prose |
+| Competitor survey, market research | **in-host subagent** | same |
+| Mapping a codebase, finding structural defects | **in-host subagent** | sees what file-by-file reading misses |
 | A genuinely different project/repo | **new cmux workspace** | fully separate context |
 | Repo-wide refactor | **one lane, running ALONE** | see §4 |
 
@@ -41,7 +56,11 @@ Checking progress while blind means going the long way round: `git status`,
 a pane shows for free.
 
 **Rule:** writing code ⇒ **always** `cmux new-split` + `codex`. Use `codex exec` only for a
-short one-shot command that needs no monitoring. If a project's own loop documentation tells
+short one-shot command that needs no monitoring — and note that it is **not the same CLI
+surface**: `codex exec` rejects `-a/--ask-for-approval` outright (`error: unexpected argument
+'-a' found`) and refuses to start outside a git repo without `--skip-git-repo-check`, both
+measured 2026-08-17. A dispatch line copied from §5 into `exec` therefore dies before the model
+is ever reached. If a project's own loop documentation tells
 you to use `codex exec`, **fix that documentation** rather than following it.
 
 ### 1.1 · Worktrees — when to split one off, and where to put it
@@ -257,10 +276,10 @@ migration against live data gets the default.
 
 | Role | Model | Why |
 |---|---|---|
-| **Orchestrating chat** — plan, briefs, verification, commits | **Opus** | it holds the whole session's context and is the only thing that verifies; a cheaper orchestrator produces cheaper verification, which is the one thing you cannot afford |
-| **Writing code in a lane** | **codex** (default) or **Sonnet 5** via `Agent` | codex runs inside the repo and is sandboxed |
-| **Read → synthesise → judge** | **Claude teammate** (`Agent`) | see §1 |
-| **Second opinion / adversarial review** | **grok**, or a codex lane with a refute-only brief | a different model family is worth more than the same one twice |
+| **Orchestrating chat** — plan, briefs, verification, commits | **your host's strongest model** (Opus · Grok 4.6 · a `sol`/`terra` codex session) | it holds the whole session's context and is the only thing that verifies; a cheaper orchestrator produces cheaper verification, which is the one thing you cannot afford |
+| **Writing code in a lane** | **codex** (default), or a claude/grok lane | codex runs inside the repo and is sandboxed |
+| **Read → synthesise → judge** | **in-host subagent** (`Agent` · `spawn_subagent`), or a lane if your host has none | see §1 |
+| **Second opinion / adversarial review** | **a different family from the one that wrote the code** — grok on codex's work, codex on grok's | a different model family is worth more than the same one twice, and that holds whichever one you are |
 
 ### codex: `sol` vs `terra` — state of knowledge, honestly
 
@@ -786,23 +805,36 @@ it from outside, so "sent it, saw no error" gets misread as "it ran". A probe mu
 
 ### 5.1 · What state is every lane in? — start here
 
-⚠️ **Two facts about CLAUDE_PLUGIN_ROOT, and they pull in opposite directions** *(both
-measured on a real install, 2026-08-13)*:
+⚠️ **Finding this plugin's own scripts is the one thing that breaks differently in every
+host** *(measured on real installs, 2026-08-13 and 2026-08-16)*:
 
-- Claude Code **substitutes** that placeholder when it loads a skill or command markdown
-  file — including inside ordinary prose, which is why this paragraph spells the name out
-  instead of writing it as a shell variable.
+- Claude Code **substitutes** the CLAUDE_PLUGIN_ROOT placeholder when it loads a skill or
+  command markdown file — including inside ordinary prose, which is why this paragraph spells
+  the name out instead of writing it as a shell variable.
 - It is **not an environment variable**. Type it into a Bash command yourself and the shell
   expands an unset name to nothing, so the path collapses to `/skills/…` and the script
   "does not exist".
+- **codex and grok put the same plugin somewhere else.** codex:
+  `~/.codex/plugins/cache/<marketplace>/cmux-workflow/<version>/`. grok:
+  `~/.grok/installed-plugins/<hash>/` — **that directory does not contain the plugin name at
+  all**, so any glob on `*cmux-workflow*` finds nothing under grok even though the plugin is
+  installed and working.
 
-So resolve it explicitly in any command you compose, and it works either way:
+So resolve it by **searching for a file that must exist**, never by guessing a path shape:
 
 ```bash
-ROOT="${CLAUDE_PLUGIN_ROOT:-}"
-[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/cache/*/cmux-workflow/*/ 2>/dev/null | sort -V | tail -1)"
-[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/marketplaces/*cmux-workflow 2>/dev/null | tail -1)"
+ROOT="${CMUX_WORKFLOW_ROOT:-${CLAUDE_PLUGIN_ROOT:-${GROK_PLUGIN_ROOT:-}}}"
+if [ ! -f "$ROOT/skills/cmux-orchestration/lane-status.sh" ]; then
+  ROOT="$(for b in "$HOME"/.claude/plugins "$HOME"/.codex/plugins "$HOME"/.grok/installed-plugins; do
+            find "$b" -maxdepth 7 -path '*skills/cmux-orchestration/lane-status.sh' 2>/dev/null | sort -V | tail -1
+          done | head -1)"
+  ROOT="${ROOT%/skills/cmux-orchestration/lane-status.sh}"
+fi
 ```
+
+Export `CMUX_WORKFLOW_ROOT` in your shell profile and the search never runs. The scripts are
+self-contained — they read `~/.cmuxterm` and shell out to `cmux` — so **any** installed copy
+works regardless of which host installed it.
 
 ```bash
 "$ROOT"/skills/cmux-orchestration/lane-status.sh --all      # or: /cmux-workflow:lanes
@@ -913,9 +945,14 @@ Then **write this at the very top of the new brief**, above even `owns`:
 
 Without that paragraph, switching tools mid-flight **loses the work** rather than transferring it.
 
-## 6 · Claude teammates
+## 6 · In-host subagents (teammates)
 
-Use `Agent` with `run_in_background: true`. The brief needs:
+`Agent` with `run_in_background: true` in Claude Code, `spawn_subagent` in grok, the built-in
+fan-out in codex. The mechanism differs; **the brief and the failure modes do not** — everything
+below was learned on Claude teammates and applies unchanged to a grok subagent. If your host has
+no in-host delegate, use a lane and read §5 instead.
+
+The brief needs:
 
 - **context to read first** — which files in the repo tell it where we are
 - **questions as the acceptance criteria**, not "research X". A report that answers no question
@@ -936,7 +973,8 @@ reported `idle · available` twice, including after a direct nudge.
 
 🔴 **But idle is not dead, and "drop it after two idles" is WRONG — that rule cost an entire
 research area.** `idleReason: "available"` means the agent ended its turn; the process and its
-whole context are still there, and a `SendMessage` resumes it exactly where it stopped. One
+whole context are still there, and one more message (`SendMessage`, or a follow-up to the
+subagent) resumes it exactly where it stopped. One
 more nudge costs one message; dropping costs everything it read and synthesised. The
 terminating condition is **a response** — an answer, or the agent saying explicitly that it
 cannot answer — never a count of nudges.
@@ -958,11 +996,16 @@ and unpushed, panes die silently, finished work goes unverified and the next ste
 dispatched.
 
 **The mechanism lives in the `orchestration-loop` skill** — read it before opening
-the first lane, not after. In one line: a bounded background command, because the harness
-re-invokes you when it exits and nothing else will.
+the first lane, not after. In one line: a bounded watcher, because in Claude Code and grok the
+host re-invokes you when it exits and nothing else will — **and in codex nothing does at all**,
+so there the same watcher runs in the foreground. That skill's *Three hosts* table is the whole
+difference; everything else about watching is identical.
 
 ```bash
-# Bash(run_in_background: true) — arm it the moment the lane is dispatched
+# arm it the moment the lane is dispatched
+#   Claude Code  Bash(run_in_background: true)
+#   grok         run_terminal_command(background: true)
+#   codex        foreground — the call blocks until the lanes end
 "$ROOT"/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60
 ```
 
@@ -973,7 +1016,8 @@ That beats `pgrep -x codex`, whose baseline drifts as other projects open their 
 **Forgot to arm one?** `lane-status.sh --all` (or `/cmux-workflow:lanes`) reconstructs the state of every
 lane after the fact — see §5.1. Reach for it first, before re-reading screens.
 
-⚠️ `/loop` is a **user-typed built-in you cannot invoke.** This skill used to say "start /loop the
+⚠️ `/loop` is a **user-typed built-in you cannot invoke** — it exists in Claude Code and grok,
+not in codex. This skill used to say "start /loop the
 moment you spawn the first lane", which is not an action available to an agent — so the step
 quietly became nothing, and three lanes finished unnoticed *(2026-08-11)*. If the user has started
 one, each firing is a round below; otherwise the watcher above is your only mechanism.
@@ -1011,7 +1055,7 @@ After each wave: the orchestrating chat verifies, updates the plan, commits — 
 | Script | Answers | Sends keystrokes? |
 |---|---|---|
 | `lane-status.sh` | **what state is every lane in** — RUNNING/DONE/BLOCKED/DEAD/EMPTY, plus what to verify, commit, close (`/cmux-workflow:lanes`) | no |
-| `lane-watch.sh` | **tell me when these lanes finish** — run with `run_in_background: true` | no |
+| `lane-watch.sh` | **tell me when these lanes finish** — background it in Claude Code / grok, foreground in codex (§7) | no |
 | `lane-health.sh` | **is this pane at a shell** — for a surface with no session-store entry, or a brief you suspect fell into the void | **yes** — §5.1a only |
 
 ## Related

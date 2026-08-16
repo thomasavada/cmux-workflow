@@ -13,13 +13,48 @@ mechanism that would tell you, and a lane will never remind you.
 
 | Approach | Result |
 |---|---|
-| `sleep 60 && check` in the foreground | **Blocked by the harness.** So is chaining shorter sleeps to get around it. |
+| `sleep 60 && check` in the foreground | **Blocked by the Claude Code harness.** So is chaining shorter sleeps to get around it. |
 | "I'll check back later" | There is no later. Nothing re-invokes you. Your turn ends and the lanes run on. |
 | Re-reading the screen every tool call | Wastes the turn on polling and still misses anything that finishes after you stop. |
-| **A background command that exits when the condition is met** | ✅ The harness re-invokes you when it exits. This is the whole trick. |
+| **A bounded background command that exits when the condition is met** | ✅ The host re-invokes you when it exits — **in Claude Code and grok**. codex has no such channel; see *Three hosts* below. |
+
+### Three hosts, one mechanism, different tool names
+
+This plugin installs into Claude Code, codex and grok. The signal (`agentLifecycle: idle` in
+cmux's session store) and both scripts are identical everywhere — **only the way you run a
+watcher differs**, and getting that wrong is how the loop silently becomes no loop at all.
+
+| | Claude Code | grok | codex |
+|---|---|---|---|
+| Run a watcher in the background | `Bash(run_in_background: true)` | `run_terminal_command(background: true)` | no background channel |
+| Told when it exits | yes — you are re-invoked | yes — a notification lands in the conversation | **no** |
+| Read its output later | the harness surfaces it | `get_command_or_subagent_output(task_id)` | read the file you redirected into |
+| Wait on several at once | one watcher each | `wait_commands_or_subagents(task_ids, mode=wait_any\|wait_all)` | — |
+| Stream events as they happen | — | the `monitor` tool (one notification per output line) | — |
+| Recurring prompt the **user** types | `/loop` | `/loop <interval> <prompt>` (60s minimum) | — |
+| Delegate reading/synthesis in-host | `Agent` | `spawn_subagent` | its own multi-agent fan-out |
+
+*(grok's tool names are from its shipped guide, `~/.grok/docs/user-guide/20-background-tasks.md`;
+codex's absence is from `codex features list` — there is no background-shell or monitor feature.)*
+
+🔴 **In codex, a backgrounded `&` watcher is worthless** — nothing re-invokes the turn, so it
+exits into a void. Two things work instead, and both are foreground:
+
+1. **Let the tool call block.** Run `lane-watch.sh <surfaces> --timeout-min N` directly. The
+   turn waits, the user watches the panes anyway, and the call returns the moment the lanes end.
+   *(Verified 2026-08-17: codex ran a 100-second foreground command to completion — it printed
+   "Still waiting for the command to finish" and then returned the full output. Where the ceiling
+   is was not measured, so size `--timeout-min` to what you are willing to lose if it is cut.)*
+2. **Make `lane-status.sh --all` the first command of every turn.** It is one file read and it
+   reports lanes that finished while nothing was watching — which in codex is *all* of them.
+
+Everything below about **conditions** applies to every host unchanged. The condition rules are
+about not lying to yourself; the table above is only about who wakes you up.
 
 ```bash
-# Bash(run_in_background: true) — returns immediately, notifies you on exit
+# Claude Code: Bash(run_in_background: true) · grok: run_terminal_command(background: true)
+#   — returns immediately, notifies you on exit
+# codex: run it in the foreground and let the call block until it prints
 W=/path/to/worktree
 n=0
 until [ -f "$W/packages/functions/src/services/theThing.test.js" ] || [ $n -ge 60 ]; do
@@ -101,8 +136,8 @@ and the field that ends the guessing — **`agentLifecycle`: `running` · `idle`
 `unknown`**. `idle` means **the turn ended**, written by the agent's own Stop hook. It is a
 recorded fact, it costs one file read, and it is per-surface.
 
-⚠️ **Two facts about CLAUDE_PLUGIN_ROOT, and they pull in opposite directions** *(both
-measured on a real install, 2026-08-13)*:
+⚠️ **The plugin root differs per host, and CLAUDE_PLUGIN_ROOT is not an environment
+variable** *(measured on real installs, 2026-08-13 and 2026-08-16)*:
 
 - Claude Code **substitutes** that placeholder when it loads a skill or command markdown
   file — including inside ordinary prose, which is why this paragraph spells the name out
@@ -110,19 +145,26 @@ measured on a real install, 2026-08-13)*:
 - It is **not an environment variable**. Type it into a Bash command yourself and the shell
   expands an unset name to nothing, so the path collapses to `/skills/…` and the script
   "does not exist".
+- codex installs to `~/.codex/plugins/cache/<marketplace>/cmux-workflow/<version>/` and grok to
+  `~/.grok/installed-plugins/<hash>/` — **grok's path does not contain the plugin name**, so a
+  name glob finds nothing there.
 
-So resolve it explicitly in any command you compose, and it works either way:
+So resolve it by searching for a file that must exist, never by guessing a path shape:
 
 ```bash
-ROOT="${CLAUDE_PLUGIN_ROOT:-}"
-[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/cache/*/cmux-workflow/*/ 2>/dev/null | sort -V | tail -1)"
-[ -d "$ROOT" ] || ROOT="$(ls -d "$HOME"/.claude/plugins/marketplaces/*cmux-workflow 2>/dev/null | tail -1)"
+ROOT="${CMUX_WORKFLOW_ROOT:-${CLAUDE_PLUGIN_ROOT:-${GROK_PLUGIN_ROOT:-}}}"
+if [ ! -f "$ROOT/skills/cmux-orchestration/lane-status.sh" ]; then
+  ROOT="$(for b in "$HOME"/.claude/plugins "$HOME"/.codex/plugins "$HOME"/.grok/installed-plugins; do
+            find "$b" -maxdepth 7 -path '*skills/cmux-orchestration/lane-status.sh' 2>/dev/null | sort -V | tail -1
+          done | head -1)"
+  ROOT="${ROOT%/skills/cmux-orchestration/lane-status.sh}"
+fi
 ```
 
 ```bash
 # both scripts live in the cmux-orchestration skill
 "$ROOT"/skills/cmux-orchestration/lane-status.sh --all                      # one-shot: which lanes are RUNNING / DONE / BLOCKED / DEAD
-"$ROOT"/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60    # Bash(run_in_background: true) — exits when they end
+"$ROOT"/skills/cmux-orchestration/lane-watch.sh 440 442 --timeout-min 60    # background in Claude Code / grok, foreground in codex — exits when they end
 ```
 
 ⚠️ **Compare `updatedAt` against a baseline, never test `idle` for presence.** The store
@@ -148,8 +190,9 @@ Three cheaper-looking signals were measured on 2026-08-13 and are all wrong:
 |---|---|---|
 | **codex lane** | `agentLifecycle: idle` newer than baseline | `running` + dead pid ⇒ crashed mid-turn |
 | **grok lane** | same | same |
-| **Claude teammate** | its report arrives as a message | **idle notification with no report** — see below |
-| **background build** | the harness notifies on exit; read the output file | non-zero exit |
+| **claude lane** | same — but it ends a turn as `needsInput`, not `idle` | same |
+| **in-host subagent** (`Agent` · `spawn_subagent`) | its report arrives as a message | **idle notification with no report** — see below |
+| **background build** | Claude Code / grok notify on exit; in codex, read the output file yourself | non-zero exit |
 
 Pick the cheapest signal that cannot lie. A file on disk cannot lie. A screen that says "Done"
 can be a summary of a failure.
@@ -198,8 +241,9 @@ A teammate that goes idle **without sending a report has not finished** — its 
 only thing that reaches you, and it sent none.
 
 But **idle is not dead.** `idleReason: "available"` means the agent ended its turn; the process and
-its whole context are still there, and a `SendMessage` resumes it exactly where it stopped. Weigh
-the two costs honestly:
+its whole context are still there, and one more message resumes it exactly where it stopped
+(`SendMessage` in Claude Code, a follow-up to the subagent in grok, `cmux send` into the pane for a
+lane). Weigh the two costs honestly:
 
 | | Cost |
 |---|---|
@@ -236,16 +280,18 @@ a whole area for the price of one message.)*
 
 ## `/loop` is not this
 
-`/loop` is a Claude Code **built-in that the user types**. It self-paces with `ScheduleWakeup` and
-re-enters your prompt on a timer. You cannot invoke it, and a project command of the same name is
-silently shadowed — do not create `.claude/commands/loop.md`.
+`/loop` is a **built-in that the user types** — in Claude Code (self-paced via `ScheduleWakeup`)
+and in grok (`/loop <interval> <prompt>`, 60s minimum, each firing a new turn). codex has no
+equivalent. **You cannot invoke it in any of them**, and in Claude Code a project command of the
+same name is silently shadowed — do not create `.claude/commands/loop.md`.
 
 So: if the user has started `/loop`, each firing is your round above. If they have not, **the
-background watcher is your only mechanism** — an instruction to "start the loop" that you cannot
-execute is the same as no loop at all, which is exactly how three lanes finished unnoticed.
+watcher is your only mechanism** — an instruction to "start the loop" that you cannot execute is
+the same as no loop at all, which is exactly how three lanes finished unnoticed.
 
 ## Related
 
 - `cmux-orchestration` (global skill) — opening lanes, the five dispatch steps, briefs
-- `agent-teams` — Claude teammates and their limits (a separate skill, not bundled here)
+- `agent-teams` — Claude teammates and their limits (a separate skill, Claude Code only, not
+  bundled here). Under grok the equivalent is `spawn_subagent`; codex has its own fan-out.
 - `.claude/commands/new-feature.md` — Phase 3 dispatch, Phase 4 verification

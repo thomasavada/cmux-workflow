@@ -7,10 +7,43 @@ The failure this exists to prevent: you dispatch three lanes, they all finish in
 and you find out twenty minutes later because your user told you. Nothing crashed. There was
 simply no mechanism that would tell you, and a lane will never remind you.
 
+## Install
+
+Works in **Claude Code**, **codex** and **grok** — one repository, one `.claude-plugin/`
+manifest, which all three read.
+
 ```
+# Claude Code
 /plugin marketplace add thomasavada/cmux-workflow
 /plugin install cmux-workflow
 ```
+
+```bash
+# codex
+codex plugin marketplace add thomasavada/cmux-workflow
+codex plugin add cmux-workflow@thomasavada-cmux-workflow
+
+# grok
+grok plugin install thomasavada/cmux-workflow --trust
+```
+
+Verified on real installs, 2026-08-16: `codex plugin marketplace add` reads
+`.claude-plugin/marketplace.json` directly, and `grok plugin validate` reports the manifest valid
+(*"grok reads the index from `.grok-plugin/marketplace.json`. It also accepts … the
+`.claude-plugin/` equivalents."*). So there is deliberately **no** duplicate `.codex-plugin/` or
+`.grok-plugin/` manifest here — three copies of a version number is three chances to ship a
+mismatch.
+
+The **skills** load in all three. Whether the two **slash commands** appear is host-dependent —
+Claude Code and grok both list plugin commands (grok reports `1 skill dir(s), 1 command dir(s)`
+for this plugin); codex was only verified to install and expose the skills. If `/cmux-workflow:lanes`
+is not there, it was never more than a wrapper: run
+`"$ROOT"/skills/cmux-orchestration/lane-status.sh --all` and you have the same thing.
+
+**One thing genuinely differs between hosts, and the skills say so where it matters:** Claude Code
+and grok notify you when a background command exits; **codex does not**, so there the watcher runs
+in the foreground. Same script, same signal, different call. See `orchestration-loop`
+§ *Three hosts, one mechanism, different tool names*.
 
 ## What you get
 
@@ -64,7 +97,11 @@ Two rules keep it honest, and both come from getting them wrong first:
   ```
   Verify: `ls ~/.cmuxterm/*-hook-sessions.json` should list a file per agent you use.
 - **`python3`** (bundled with macOS) — the scripts parse the store with it
-- At least one agent CLI: `codex`, `grok`, or another one cmux integrates
+- At least one agent CLI to run *in* the lanes: `codex`, `grok`, `claude`, or another one cmux
+  integrates. This is independent of which CLI you orchestrate *from* — a Claude Code session can
+  drive codex lanes, a codex session can drive grok lanes, and so on.
+- Optional: export `CMUX_WORKFLOW_ROOT=<install path>` to skip the plugin-root search the skills
+  do (each host installs to a different path shape, and grok's does not contain the plugin name)
 
 **cmux's own skills are not bundled here.** `cmux`, `cmux-workspace`, `cmux-diagnostics` and the
 rest are [manaflow-ai's](https://cmux.com/docs/skills) and ship with cmux — install them with

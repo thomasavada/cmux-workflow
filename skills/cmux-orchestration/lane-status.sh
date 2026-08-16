@@ -265,7 +265,8 @@ if unarmed:
     print("       lane-watch.sh " + " ".join(o["ref"].split(":")[1] for o in unarmed))
 if cl_done:
     print("  💬 Claude session ended its turn — do NOT close it. Idle is not done:")
-    print("     if it never reported, nudge it with SendMessage; closing loses everything it read.")
+    print("     if it never reported, nudge it (SendMessage, or cmux send into the pane);")
+    print("     closing loses everything it read.")
     for o in cl_done: print(f'       {o["ref"]} "{o["title"]}" — {o["why"]}')
 if not (blocked or dead or done or unarmed or cl_done):
     print("  — nothing. Every lane is running and every one has a watcher.")

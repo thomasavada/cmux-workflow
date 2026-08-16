@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Arm a bounded watcher on one or more lanes. Exits when every lane has ENDED ITS TURN, or on
-# timeout. Run it with Bash(run_in_background: true): the harness re-invokes you when a
-# background command exits, and that re-invocation is the ONLY mechanism that will ever tell
-# you a lane finished. `sleep 60 && check` in the foreground is blocked, and "I'll check back
-# later" is not a mechanism — your turn ends and the lanes run on.
+# timeout. How you run it depends on your host, and that is the ONE thing that differs:
+#   Claude Code  Bash(run_in_background: true)                  — you are re-invoked on exit
+#   grok         run_terminal_command(background: true)          — a notification lands in chat
+#   codex        FOREGROUND, and let the call block              — nothing there re-invokes you
+# That re-invocation (or the blocking call) is the only mechanism that will ever tell you a lane
+# finished. `sleep 60 && check` in the foreground is blocked in Claude Code, and "I'll check back
+# later" is not a mechanism anywhere — your turn ends and the lanes run on.
 #
 # Usage:  lane-watch.sh 440 442
 #         lane-watch.sh 440 --timeout-min 90

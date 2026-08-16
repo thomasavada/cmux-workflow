@@ -104,7 +104,7 @@ One lane proves the plumbing. **Four show what it is for**, and they finish at d
 | Lane | Agent | Why it is here |
 |---|---|---|
 | `DEMO-1 hello` | codex `low` | fastest possible lane — the first `DONE` lands while you are still talking |
-| `DEMO-2 review` | **claude `--model sonnet`** | a lane is not "a codex thing"; Opus orchestrates, Sonnet works |
+| `DEMO-2 review` | **claude `--model sonnet`** | a lane is not "a codex thing" — and it need not be the family you are driving from; the big model orchestrates, a cheaper one works |
 | `DEMO-3 security` | codex `xhigh`, read-only | effort chosen by **blast radius**, not by how hard it feels |
 | `DEMO-4 implement` | codex in the **worktree** | the only one that writes code — and it cannot commit |
 
@@ -180,13 +180,14 @@ Then the tooling on top of it:
 
 ```bash
 lane-status.sh --all                          # RUNNING / DONE / BLOCKED / DEAD / EMPTY, per lane
-lane-watch.sh <N> <N> <N> --timeout-min 8     # Bash(run_in_background: true)
+lane-watch.sh <N> <N> <N> --timeout-min 8     # background it in Claude Code / grok; foreground in codex
 ```
 
 `lane-status` reads `agentLifecycle` from cmux's own store — a fact written by each agent's Stop
 hook, not a `pgrep` guess. Show the `⚠ no watcher` flags, then arm one and show them disappear.
-*Why background:* the harness re-invokes you when a background command **exits**; that is the only
-mechanism that will ever tell you a lane finished. Three lanes, one watcher, all three fired
+*Why background:* Claude Code and grok re-invoke you when a background command **exits**; that is
+the only mechanism that will ever tell you a lane finished. If you are demoing from codex, say
+that it has no such channel and run the watcher in the foreground — the wait is the demo. Three lanes, one watcher, all three fired
 `DONE` at ~20s on 2026-08-13.
 
 ⚠️ codex and Claude **end a turn differently** — codex goes `idle`, Claude goes `needsInput`
