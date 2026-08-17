@@ -49,7 +49,7 @@ you to use `codex exec`, **fix that documentation** rather than following it.
 A lane running in the **current checkout** is the default: cheap, no extra disk, no
 `node_modules` reinstall. Split off a **git worktree** only when one of these holds:
 
-- two jobs **could touch the same file** — an `owns` boundary cannot cut them apart cleanly
+- two jobs **could touch the same file** — a "Files You May Edit" boundary cannot cut them apart cleanly
 - the job needs its **own branch** to open an independent MR
 - the job runs **unattended**, and you don't want it touching the tree you're working in
 
@@ -227,10 +227,10 @@ The **dispatch instructions** are a different thing and do not belong in it:
 | Content | Where | Lifetime |
 |---|---|---|
 | Problem, evidence, design decisions, acceptance criteria | `docs/plans/<slug>.md` — **committed** | durable, reviewable |
-| `owns` paths, "lane X holds Y — don't touch", "do not commit and why" | the `cmux send` string itself | one dispatch |
+| editable paths, "lane X holds Y — don't touch", "do not commit and why" | the `cmux send` string itself | one dispatch |
 
 They are short enough to pass inline, and they are **wrong the moment that lane closes** — a
-committed `owns` list misleads the next reader into thinking it is a real constraint. Point the
+committed "Files You May Edit" list misleads the next reader into thinking it is a real constraint. Point the
 lane at the plan and state only the boundary:
 
 ```
@@ -348,10 +348,10 @@ A brief missing any section below fails in a way it has already failed for real:
 ```markdown
 # Lane <id> — <one-line description>
 
-## owns — edit ONLY these
+## Files You May Edit
 <list of paths>
 Lane <other> is running and holds <path> — do not touch.
-Need a file outside this scope ⇒ write it under `## Blocked on`, do not edit it yourself.
+Need a file outside this scope ⇒ write it under `## Blocked On`, do not edit it yourself.
 
 ## Problem
 <concrete evidence: file:line, query output, a measurement — not a general description>
@@ -359,24 +359,24 @@ Need a file outside this scope ⇒ write it under `## Blocked on`, do not edit i
 ## Direction
 <design constraints, known traps, precedent already in the repo>
 
-## done — acceptance criteria
+## Acceptance Criteria
 - [ ] <machine-checkable, not "fixed it">
 
-## Before committing
+## Before You Report Done
 <the exact test command> · No `git add -A` · **MUST write tests**
 ```
 
-### 🔴 Rule one: derive `owns` from the **acceptance criteria**, not from where you spotted the bug
+### 🔴 Rule one: derive "Files You May Edit" from the **acceptance criteria**, not from where you spotted the bug
 
 Got this wrong four times in one day, each time at a different layer:
 
-- assigned the rule "numbers must belong to one series" but `owns` was missing a page → a later lane had to clean up
-- assigned a three-state rule, but the lane could not reach a page outside `owns`
+- assigned the rule "numbers must belong to one series" but the editable list was missing a page → a later lane had to clean up
+- assigned a three-state rule, but the lane could not reach a page outside its editable list
 - wrote the criterion *"both pages read the same source"* then granted edit rights to only one page
 - assigned phases from a draft, after which the final version changed the target shape
 
-**Ask before writing `owns`:** *what does this acceptance criterion require touching?* Then
-list all of it. A rule reaches exactly the files in `owns` — not one line further.
+**Ask before writing "Files You May Edit":** *what does this acceptance criterion require touching?* Then
+list all of it. A rule reaches exactly the files on that list — not one line further.
 
 ### 🔴 Rule two: a long brief is a cost, not diligence
 
@@ -450,7 +450,7 @@ work sits on disk untouched; not committing loses nothing.*
   **unreviewable and cannot be reverted separately**, and the other two lanes suddenly saw a
   clean `git status` and assumed they had done nothing.
   ⇒ Write it into the brief as an **instruction with a list**: *"`git add` only the exact paths
-  in `owns`, listed one by one"* — `No git add -A` alone is **not enough**, because it states
+  in "Files You May Edit", listed one by one"* — `No git add -A` alone is **not enough**, because it states
   what not to do without stating what to do.
 - **Environment traps** — occupied ports, environment variables, the exact command to run. A
   lane cannot guess these, and will burn a round discovering them.
@@ -478,7 +478,7 @@ not by tests. Typecheck green, tests green, smoke green — and the number on sc
 - **A repo-wide refactor cannot be split.** Two lanes moving files at once = a broken repo.
   It is the critical path: run it alone, close the other lanes first.
 - **Don't give lane B work that lane A is going to delete.** That's rework, not parallelism.
-- **Real parallelism = completely disjoint `owns`.** One overlapping file is enough to break it.
+- **Real parallelism = completely disjoint editable lists.** One overlapping file is enough to break it.
 
 When the user wants more lanes than the work supports, **state the constraint** instead of
 opening lanes for the sake of it. The fastest route to the goal is usually to close the current
@@ -902,7 +902,7 @@ git diff --stat           # capture: how far along
 # NO git checkout. NO git stash. Leave it exactly as is.
 ```
 
-Then **write this at the very top of the new brief**, above even `owns`:
+Then **write this at the very top of the new brief**, above even "Files You May Edit":
 
 > ⚠️ The working tree **already contains** in-flight work from a previous turn that was stopped
 > mid-way (stopped deliberately, not a crash). Run `git diff` and `git status` **first**. Your
@@ -980,7 +980,7 @@ one, each firing is a round below; otherwise the watcher above is your only mech
 
 **What a round checks that is specific to lanes:**
 
-1. `git status --porcelain` — and specifically, **did anything change outside every lane's `owns`
+1. `git status --porcelain` — and specifically, **did anything change outside every lane's editable list
    list**. A running dev server can rewrite generated files (a tunnel URL, a manifest, a lockfile) on
    its own; those belong to no lane and get swept into a broad `git add`.
 2. `cmux read-screen` on each lane, and `cmux list-panes` for ones that died. **A dead pane is a
@@ -998,7 +998,7 @@ decision. A loop that keeps running with no work is just noise.
 ## 8 · Sequencing multiple waves
 
 ```
-wave 1   lanes with disjoint owns          → run in parallel
+wave 1   lanes with disjoint file lists    → run in parallel
          (close them all before wave 2)
 wave 2   the critical path                 → ONE lane, running alone
 wave 3   wide fan-out on the now-stable base
