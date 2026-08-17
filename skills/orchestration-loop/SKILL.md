@@ -229,7 +229,7 @@ Do **not** open a watcher per lane and *also* re-read every screen each turn. Pi
 
 ## Each round, five things
 
-1. `git status --porcelain` — what changed, and **did anything outside the `owns` list change**
+1. `git status --porcelain` — what changed, and **did anything outside the "Files You May Edit" list change**
 2. `cmux read-screen` on each lane — a live process is not a working lane; a summary is not a result
 3. **Run the gate yourself** — your project's test command; read the output, compare the count to before
 4. Check one specific claim from the report against the code

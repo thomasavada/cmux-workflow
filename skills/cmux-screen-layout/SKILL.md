@@ -35,12 +35,42 @@ once" — it is "how many does the person actually need to glance at."
 | **5+** | **tabs**: one or two panes, extra lanes as `new-surface --pane` | past four, splitting makes every lane useless; tab them and switch |
 | different project | `cmux new-workspace --name "<slug>"` | it has its own name flag, unlike `new-split` |
 
-⚠️ **UNVERIFIED — the grid recipe above needs a human eye.** `cmux new-split down --surface <s>`
-was expected to split *inside* that surface's column; on 2026-08-13 it added another **flat** pane
-instead, and `cmux tree` prints every pane at the same level either way, so the CLI alone cannot
-tell you whether you got a grid or another column. Until someone confirms it against the actual
-screen: **open two panes, look at them, and only then decide whether a third is readable.** If it
-is not, use tabs (`new-surface --pane`) rather than trusting this table.
+### Ask the CLI what you actually built
+
+`cmux tree` prints every pane at the same level, so it cannot tell a grid from a row of columns.
+**`cmux list-panes --json` can** — it returns a `pixel_frame` (`x`, `y`, `width`, `height`) plus
+`columns`/`rows` for every pane. Read the geometry instead of guessing at it:
+
+```bash
+cmux list-panes --workspace workspace:N --json | python3 -c '
+import json, sys
+panes = json.load(sys.stdin)["panes"]
+for p in sorted(panes, key=lambda p: (p["pixel_frame"]["x"], p["pixel_frame"]["y"])):
+    f = p["pixel_frame"]
+    print("%-9s x=%5.0f y=%5.0f %7.1fx%-7.1f %dx%d" % (
+        p["ref"], f["x"], f["y"], f["width"], f["height"], p["columns"], p["rows"]))
+'
+```
+
+Two panes sharing an `x` but differing in `y` are stacked; two sharing a `y` and differing in `x`
+are side by side. That is the whole test, and it takes one command.
+
+### The one-call grid: `new-workspace --layout`
+
+A `--layout` child may itself be a `direction`/`children` node instead of a `pane`, and that
+nesting is what produces a real grid — no `new-split` sequence, no rename pass, and the geometry
+is declared rather than discovered. Layout surfaces carry their own `command` (and per the CLI
+contract, their own `env`).
+
+Measured 2026-08-14 on a 1591×1096 pane area, `split: 0.55` horizontal wrapping a nested vertical
+pair: lead pane `875.1×1096.0` at `x=240` → **108×59**; the two stacked panes both `715.9×548.0`
+at `x=1115`, `y=28` and `y=576` → **88×28** each. A true grid, and every pane twice the ~40-column
+width where a codex TUI stops being readable.
+
+⚠️ **Still unverified: `cmux new-split down --surface <s>`.** On 2026-08-13 it added another flat
+pane rather than splitting inside that surface's column. That measurement stands and has not been
+retaken — but you no longer need a human eye to settle it, because `list-panes --json` above will
+tell you in one command. Prefer `--layout` when you know the shape up front.
 
 ⚠️ **Never split more than twice in the same direction.** Three `new-split right` in a row gives
 three narrow columns; the third is already too tight for codex's box drawing, and you will misread
@@ -74,6 +104,7 @@ name breaks that chain.
 
 ```bash
 cmux list-panes                                   # panes only — no names
+cmux list-panes --json                            # + pixel_frame and columns/rows per pane
 cmux list-pane-surfaces --pane pane:N             # surfaces AND their names, per pane
 cmux resize-pane --pane pane:N -R --amount 20     # tmux-compatible: -L -R -U -D
 cmux swap-pane / join-pane / break-pane / split-off
