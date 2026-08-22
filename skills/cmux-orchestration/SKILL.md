@@ -1,12 +1,31 @@
 ---
 name: cmux-orchestration
-description: Pick the right tool for parallel work — cmux lane (codex/grok/claude) vs an in-host subagent vs a new worktree+workspace — then write the brief, open the lane, verify it, check whether it finished, and clean it up. Use when the user says "spawn lane", "split into lanes", "run this in parallel", "spawn teammate", "worktree for this feature", "isolate this task", or when a large job needs cutting up for several agents. Also use to AUDIT lanes already running — "are the lanes done", "did codex finish", "check the lanes", "which lanes are still open", "close the finished lanes", "clean up the panes" — via `lane-status.sh` (§5.1), the recovery path when no watcher was armed. Requires cmux — for pure Claude teammates see `agent-teams`.
+description: Pick the right tool for parallel work — cmux lane (codex/grok/claude) vs an in-host subagent vs a new worktree+workspace — then write the brief, open the lane, verify it, check whether it finished, and clean it up. Use when work can be split (a feature with disjoint files, "implement the plan", "build this", several independent bugs), when the user says spawn/split/parallel/lane/worktree/isolate, when they say continue/keep going after compact, when you are about to implement several slices yourself one-by-one, or to AUDIT lanes already running ("are the lanes done", "did codex finish", "close the finished lanes") via `lane-status.sh` (§5.1). Compact drops this skill — re-invoke it before doing the work yourself. Requires cmux — for pure Claude teammates see `agent-teams`.
 ---
 
 # Parallel work: lane, teammate, or workspace
 
 Distilled from one session running ~20 lanes and 5 teammates on a real codebase. Every rule
 here comes from a specific failure, not from theory.
+
+## 0a · Compact deletes this file from context — self-invoke
+
+The body you are reading is loaded **once**. `/compact`, auto-compact, `/clear`, and a
+turn that never auto-invoked the skill all drop it. What remains is the goal. The
+default after that is to execute the slices **yourself, one file at a time**. That is
+the failure this plugin exists to prevent — measured, not theoretical
+*(2026-08-22: skill invoked, conversation compacted, orchestrator continued the
+slices itself instead of re-spawning lanes)*.
+
+**Self-invoke:** if this heading is not already in context this turn, `Read` this
+SKILL.md **before the next edit** — same ROOT search as §5.1, then
+`$ROOT/skills/cmux-orchestration/SKILL.md`. Then follow §1 and §5.0. Doing the
+slices in this chat is not a fallback.
+
+A durable copy of this rule belongs in `CLAUDE.md` and `AGENTS.md` (those files are
+re-injected after compact; this skill is not). `cmux-workflow-setup` writes it.
+If those files do not contain a `cmux-workflow` section, run that skill once on
+the repo — otherwise the turn after compact has nothing pointing back here.
 
 ## 0 · Which host are you running in
 
@@ -1060,6 +1079,8 @@ After each wave: the orchestrating chat verifies, updates the plan, commits — 
 
 ## Related
 
+- **`cmux-workflow-setup`** — writes the compact-survival block into `CLAUDE.md` and
+  `AGENTS.md`. Without it, §0a has nothing durable to fire after compact.
 - **`cmux-screen-layout`** — where the panes go: splitting vs tabs, the grid rule for 3–4 lanes,
   naming, resizing, and repairing a layout that has become unreadable. **This skill owns *what*
   runs in a pane; that one owns *where the pane is*.** Read it before opening the third lane —

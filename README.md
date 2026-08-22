@@ -49,10 +49,12 @@ in the foreground. Same script, same signal, different call. See `orchestration-
 
 | | |
 |---|---|
-| `cmux-workflow:cmux-orchestration` | Pick the tool (lane · teammate · worktree+workspace), write the brief, open the pane, diagnose it, clean it up |
+| `cmux-workflow:cmux-orchestration` | Pick the tool (lane · teammate · worktree+workspace), write the brief, open the pane, diagnose it, clean it up. Self-invokes after compact — sequential one-by-one work is the failure, not a fallback |
 | `cmux-workflow:orchestration-loop` | The watcher mechanism — why the foreground poll you reach for first is blocked, and what condition actually means *done* |
 | `cmux-workflow:cmux-screen-layout` | Where the panes go, so four lanes stay readable instead of becoming four unreadable columns |
+| `cmux-workflow:cmux-workflow-setup` | Pin a compact-survival block into `CLAUDE.md` and `AGENTS.md` so the skill still fires when it was not auto-invoked, and after `/compact` |
 | `/cmux-workflow:lanes` | One command: the state of every lane right now, and what to verify, commit or close |
+| `/cmux-workflow:setup` | Run the setup skill — writes (or refreshes) the `CLAUDE.md` / `AGENTS.md` block |
 | `/cmux-workflow:demo` | A live guided walkthrough — sidebar, groups, status lanes, four agents at once, then a clean teardown |
 
 Two scripts do the work, and **neither one sends a keystroke into a pane**:
@@ -103,6 +105,30 @@ Two rules keep it honest, and both come from getting them wrong first:
 - Optional: export `CMUX_WORKFLOW_ROOT=<install path>` to skip the plugin-root search the skills
   do (each host installs to a different path shape, and grok's does not contain the plugin name)
 
+## Compact drops the skill — pin it into CLAUDE.md / AGENTS.md
+
+A skill body is loaded once. `/compact`, auto-compact, and a turn that never auto-invoked
+`cmux-orchestration` all leave the agent holding the goal and none of the rules. The default
+after that is to implement the slices **in the orchestrating chat, one file at a time**.
+
+`CLAUDE.md` and `AGENTS.md` are re-injected after compact. The skill is not. Run this once
+per repo (and once with `--global` if you want it in every project):
+
+```
+/cmux-workflow:setup
+```
+
+```bash
+python3 "$ROOT/skills/cmux-workflow-setup/install-block.py"          # ./CLAUDE.md + ./AGENTS.md
+python3 "$ROOT/skills/cmux-workflow-setup/install-block.py" --global # ~/.claude/CLAUDE.md + ~/.grok/AGENTS.md
+```
+
+The installer is idempotent. It writes a marked section that says: re-read
+`cmux-orchestration` this turn, spawn lanes, do not continue sequentially. Claude Code also
+re-injects a short reminder on session start / clear / compact via `hooks/reinvoke.sh`.
+grok's SessionStart hook cannot inject context, which is why the markdown files are the
+cross-host path.
+
 **cmux's own skills are not bundled here.** `cmux`, `cmux-workspace`, `cmux-diagnostics` and the
 rest are [manaflow-ai's](https://cmux.com/docs/skills) and ship with cmux — install them with
 `npx skills add manaflow-ai/cmux -g -y`. This plugin calls the `cmux` **CLI** directly and does
@@ -122,6 +148,8 @@ the date and the cost. A few of them:
   *neighbourhood* (a directory, a URL being present) instead of the deliverable.
 - Five lanes finished and the user reported *"none of them committed anything"* — everything was
   committed locally and nothing had been pushed.
+- After compact the skill body is gone, and the orchestrator continues the remaining slices
+  itself one-by-one instead of re-spawning lanes *(2026-08-22)*.
 
 The skills are written to be read by an agent, so they are blunt about which mistakes cost what.
 If you disagree with a rule, the incident behind it is stated inline; argue with that.

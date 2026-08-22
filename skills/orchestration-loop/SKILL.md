@@ -1,6 +1,6 @@
 ---
 name: orchestration-loop
-description: Keep watch over background work you dispatched — cmux lanes (codex/grok), Claude teammates, long builds — so a finished lane does not sit unnoticed. Use whenever you have spawned anything that runs on its own and you will need to know when it is done. Covers the watcher patterns that actually notify you, why the foreground poll you reach for first is blocked, and what to check each round. Not the same as `/loop`, which only the user can type.
+description: Keep watch over background work you dispatched — cmux lanes (codex/grok), Claude teammates, long builds — so a finished lane does not sit unnoticed. Use whenever you have spawned anything that runs on its own and you will need to know when it is done, and again after conversation compact (compact drops this skill; the watcher firing is not enough — re-read it before the next round). Covers the watcher patterns that actually notify you, why the foreground poll you reach for first is blocked, and what to check each round. Not the same as `/loop`, which only the user can type.
 ---
 
 # The orchestration loop
@@ -8,6 +8,12 @@ description: Keep watch over background work you dispatched — cmux lanes (code
 **The failure this prevents:** you dispatch three lanes, they all finish in four minutes, and you
 find out twenty minutes later because the user told you. Nothing crashed. You simply had no
 mechanism that would tell you, and a lane will never remind you.
+
+**Compact is the other failure.** The watcher may still be running when `/compact` (or
+auto-compact) drops this skill from context. The next time it fires you are re-invoked
+holding the goal and none of the rules. Re-read `cmux-orchestration` (its §0a) and this
+file before that round's first tool call — same ROOT search as that skill's §5.1. Then
+arm the next watcher. A round that continues sequentially is a loop that silently ended.
 
 ## The mechanism, and why the obvious one does not work
 
@@ -291,7 +297,9 @@ the same as no loop at all, which is exactly how three lanes finished unnoticed.
 
 ## Related
 
-- `cmux-orchestration` (global skill) — opening lanes, the five dispatch steps, briefs
+- `cmux-orchestration` (global skill) — opening lanes, the five dispatch steps, briefs.
+  Compact survival is §0a there; `cmux-workflow-setup` writes the durable copy into
+  `CLAUDE.md` / `AGENTS.md`.
 - `agent-teams` — Claude teammates and their limits (a separate skill, Claude Code only, not
   bundled here). Under grok the equivalent is `spawn_subagent`; codex has its own fan-out.
 - `.claude/commands/new-feature.md` — Phase 3 dispatch, Phase 4 verification
