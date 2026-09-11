@@ -26,8 +26,16 @@ Before any multi-file or splittable implementation:
    `~/.grok/installed-plugins` for `skills/cmux-orchestration/SKILL.md` and open it. If you
    cannot quote §5.0's five dispatch steps, you have not read it this turn.
 2. **Spawn lanes** for disjoint `owns`. Do not implement those slices in this chat.
-3. **Arm** `orchestration-loop` (`lane-watch.sh`) the moment a lane starts.
-4. If lanes might already exist: `lane-status.sh --all` before opening more.
+3. **Arm the watcher in the same turn you dispatch** — `lane-watch.sh`, or
+   `orca-lane-watch.sh` if the host is Orca. Not next turn. A lane nobody is watching
+   becomes the user asking whether it is done.
+4. If lanes might already exist: `lane-status.sh --all` (or `orca-lane-status.sh --all`)
+   before opening more.
+
+**On Orca, read `orca-orchestration` for the mechanics** — terminal creation, the probe,
+and a completion signal that works there. `tui-idle` reports idle mid-turn, and codex's
+`Worked for` footer is absent on short turns, so both lie. The when/how-to-brief rules
+above are shared and are not repeated there.
 
 A one-line fix, a question, or work that cannot be split stays in this chat. Everything else
 is a lane. Refresh this block with `cmux-workflow-setup`.
