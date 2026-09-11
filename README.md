@@ -56,6 +56,7 @@ in the foreground. Same script, same signal, different call. See `orchestration-
 | `/cmux-workflow:lanes` | One command: the state of every lane right now, and what to verify, commit or close |
 | `/cmux-workflow:setup` | Run the setup skill — writes (or refreshes) the `CLAUDE.md` / `AGENTS.md` block |
 | `/cmux-workflow:demo` | A live guided walkthrough — sidebar, groups, status lanes, four agents at once, then a clean teardown |
+| `cmux-workflow:orca-orchestration` | The same discipline, hosted in **Orca** instead of cmux. Owns only what differs: terminal creation, the probe, the flag traps, and a completion signal that works |
 
 Two scripts do the work, and **neither one sends a keystroke into a pane**:
 
@@ -63,6 +64,23 @@ Two scripts do the work, and **neither one sends a keystroke into a pane**:
 lane-status.sh --all                    # RUNNING / DONE / BLOCKED / DEAD / EMPTY, per lane
 lane-watch.sh 440 442 --timeout-min 60  # run in background; exits when those lanes end their turn
 ```
+
+Orca gets its own pair, because the signal cmux relies on does not exist there:
+
+```bash
+orca-lane-status.sh --all                          # busy / idle / unknown, per lane
+orca-lane-watch.sh --handles term_aaa,term_bbb     # exits on the busy→idle transition
+orca-lane-watch.sh --auto                          # every codex lane in this worktree
+```
+
+**Why Orca needs a different watcher.** cmux publishes `agentLifecycle: idle` from its
+own turn-hook store — a recorded fact. Orca has no equivalent: `orca terminal wait --for
+tui-idle` reports idle *mid-turn*. The obvious replacement, codex's `─ Worked for 27m 57s ─`
+footer, is worse than it looks — it is printed only for long turns, so a watcher built on it
+passes every test against slow lanes and then hangs forever on a fast one. The Orca watcher
+reads the input box instead (`esc to interrupt` = busy; the prompt with no busy marker =
+idle) and refuses to call a lane done until it has seen it busy, so a terminal parked at its
+prompt cannot settle it instantly.
 
 ## The idea worth stealing, even if you never install this
 

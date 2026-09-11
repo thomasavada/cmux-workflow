@@ -1,7 +1,7 @@
 {
   "name": "cmux-workflow",
-  "version": "0.6.0",
-  "description": "Run parallel coding agents as cmux panes and actually know when they finish. Skills and commands for dispatching codex/grok/claude lanes, watching them with a signal that cannot lie (cmux's own turn-hook session store, not `pgrep`), surviving conversation compact (self-invoke + CLAUDE.md/AGENTS.md), auditing lanes you forgot to watch, and cleaning them up. Installs and runs in Claude Code, codex and grok — the skills call out the one place the three hosts genuinely differ. Every rule in here comes from a measured failure in a real session, not from theory.",
+  "version": "0.7.0",
+  "description": "Run parallel coding agents as cmux panes and actually know when they finish. Skills and commands for dispatching codex/grok/claude lanes, watching them with a signal that cannot lie (cmux's own turn-hook session store, not `pgrep`), surviving conversation compact (self-invoke + CLAUDE.md/AGENTS.md), auditing lanes you forgot to watch, and cleaning them up. Installs and runs in Claude Code, codex and grok \u2014 the skills call out the one place the three hosts genuinely differ. Every rule in here comes from a measured failure in a real session, not from theory. Also ships `orca-orchestration` for Orca-hosted lanes, whose completion signal is read off the live input box because Orca's `tui-idle` reports idle mid-turn and codex's `Worked for` footer is absent on short turns.",
   "author": {
     "name": "thomasavada",
     "url": "https://github.com/thomasavada"
@@ -20,6 +20,8 @@
     "worktree",
     "lanes",
     "background-tasks",
-    "agent-monitoring"
+    "agent-monitoring",
+    "orca",
+    "orca-cli"
   ]
 }

@@ -9,8 +9,14 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SKILL="${PLUGIN_ROOT}/skills/cmux-orchestration/SKILL.md"
 LOOP="${PLUGIN_ROOT}/skills/orchestration-loop/SKILL.md"
 STATUS="${PLUGIN_ROOT}/skills/cmux-orchestration/lane-status.sh"
+ORCA_SKILL="${PLUGIN_ROOT}/skills/orca-orchestration/SKILL.md"
+ORCA_STATUS="${PLUGIN_ROOT}/skills/orca-orchestration/orca-lane-status.sh"
 
-msg="cmux-workflow: this session started, was cleared, or was compacted — cmux-orchestration is NOT in context. Sequential one-by-one implementation is the failure this plugin exists to prevent. Before the next code edit, read ${SKILL} (self-invoke, §0a) and ${LOOP}. Then spawn lanes. If lanes may already be running, run ${STATUS} --all first. Durable copy of this rule: CLAUDE.md / AGENTS.md (cmux-workflow-setup)."
+# Name both hosts. A reminder that says only "cmux" is ignorable in an Orca
+# session — the tool named is not the tool in front of you, so the rule reads as
+# someone else's problem. The watcher is the half that gets dropped, so it is
+# called out separately rather than left implied by "read the skill".
+msg="cmux-workflow: this session started, was cleared, or was compacted — the orchestration skills are NOT in context. Sequential one-by-one implementation is the failure this plugin exists to prevent. Before the next code edit, read ${SKILL} (self-invoke, §0a) and ${LOOP}. Then spawn lanes. If the host is Orca rather than cmux, read ${ORCA_SKILL} instead for the mechanics — the when/how-to-brief rules are shared. ARM THE WATCHER IN THE SAME TURN YOU DISPATCH; a lane nobody is watching turns into the user asking whether it is done. If lanes may already be running: ${STATUS} --all (cmux) or ${ORCA_STATUS} --all (Orca). Durable copy of this rule: CLAUDE.md / AGENTS.md (cmux-workflow-setup)."
 
 escape_for_json() {
   local s="$1"

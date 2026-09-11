@@ -6,15 +6,15 @@
     "url": "https://github.com/thomasavada"
   },
   "metadata": {
-    "description": "cmux-workflow: dispatch parallel coding agents as cmux panes, and know the moment each one finishes.",
-    "version": "0.6.0"
+    "description": "cmux-workflow: dispatch parallel coding agents as cmux or Orca panes, and know the moment each one finishes.",
+    "version": "0.7.0"
   },
   "plugins": [
     {
       "name": "cmux-workflow",
       "source": "./",
-      "description": "Run parallel coding agents as cmux panes and actually know when they finish. Dispatch codex/grok/claude lanes with briefs that survive, watch them via cmux's own turn-hook session store (`agentLifecycle: idle` — a recorded fact, not a `pgrep` guess), survive conversation compact by pinning a self-invoke block into CLAUDE.md/AGENTS.md, audit lanes you forgot to watch, and clean them up safely. Runs in Claude Code, codex and grok. Ships `/cmux-workflow:lanes`, `/cmux-workflow:setup`, plus `lane-status.sh` and `lane-watch.sh`.",
-      "version": "0.6.0",
+      "description": "Run parallel coding agents as cmux panes and actually know when they finish. Dispatch codex/grok/claude lanes with briefs that survive, watch them via cmux's own turn-hook session store (`agentLifecycle: idle` \u2014 a recorded fact, not a `pgrep` guess), survive conversation compact by pinning a self-invoke block into CLAUDE.md/AGENTS.md, audit lanes you forgot to watch, and clean them up safely. Runs in Claude Code, codex and grok. Ships `/cmux-workflow:lanes`, `/cmux-workflow:setup`, plus `lane-status.sh` and `lane-watch.sh`. Also ships `orca-orchestration` for Orca-hosted lanes, whose completion signal is read off the live input box because Orca's `tui-idle` reports idle mid-turn and codex's `Worked for` footer is absent on short turns.",
+      "version": "0.7.0",
       "author": {
         "name": "thomasavada",
         "url": "https://github.com/thomasavada"
