@@ -57,6 +57,7 @@ in the foreground. Same script, same signal, different call. See `orchestration-
 | `/cmux-workflow:setup` | Run the setup skill — writes (or refreshes) the `CLAUDE.md` / `AGENTS.md` block |
 | `/cmux-workflow:demo` | A live guided walkthrough — sidebar, groups, status lanes, four agents at once, then a clean teardown |
 | `cmux-workflow:orca-orchestration` | The same discipline, hosted in **Orca** instead of cmux. Owns only what differs: terminal creation, the probe, the flag traps, and a completion signal that works |
+| `/cmux-workflow:orca-demo` | The Orca walkthrough — two lanes, a watcher armed in the same turn, and the four traps that each cost a real session. Built around the one thing Orca cannot tell you |
 
 Two scripts do the work, and **neither one sends a keystroke into a pane**:
 
