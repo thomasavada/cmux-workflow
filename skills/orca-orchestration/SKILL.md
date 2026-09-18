@@ -1,6 +1,15 @@
 ---
 name: orca-orchestration
-description: Dispatch and watch parallel coding-agent lanes as Orca terminals, and know the moment each finishes. Use when the host is Orca (the user says "orca", "$orca-cli", "split in orca", "spawn codex in a worktree" and Orca is running), when lanes may already be running in Orca ("are the lanes done", "close the finished lanes"), or when you are about to implement several disjoint slices yourself one by one. The WHEN-to-lane and how-to-brief rules live in cmux-orchestration and are not repeated here — this skill owns only what Orca genuinely does differently: terminal creation, the probe, and a completion signal that does not lie.
+description: >-
+  Dispatch and watch parallel coding-agent lanes as Orca terminals, and know the
+  moment each finishes. Use when the host is Orca (the user says "orca",
+  "$orca-cli", "split in orca", "spawn codex in a worktree" and Orca is
+  running), when lanes may already be running in Orca ("are the lanes done",
+  "close the finished lanes"), or when you are about to implement several
+  disjoint slices yourself one by one. The WHEN-to-lane and how-to-brief rules
+  live in cmux-orchestration and are not repeated here — this skill owns only
+  what Orca genuinely does differently: terminal creation, the probe, and a
+  completion signal that does not lie.
 ---
 
 # Orca lanes
