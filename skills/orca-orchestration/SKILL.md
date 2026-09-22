@@ -82,9 +82,28 @@ ALL LANES FINISHED
 
 To audit lanes you did not watch: `orca-lane-status.sh` (`--all` for every worktree).
 
-## 2 · Dispatch — the five steps, with Orca mechanics
+## 2 · Dispatch — decide WHERE the lane lives before you open it
 
-Same five steps as the shared skill. Only the commands differ.
+Two shapes, and the cheap one is the default:
+
+| | **Lane here** (terminal in this workspace) | **New worktree** |
+|---|---|---|
+| Cost | instant, no setup | a fresh checkout, setup hooks, a card to clean up later |
+| Work lands | in the checkout you are already using | in its own tree, on its own branch |
+| Use when | slices touch **disjoint files** — the normal case | slices would collide, or the lane needs a different base branch |
+
+🔴 **Do not open a worktree by reflex.** Eight finished worktrees sat on disk
+days after they shipped because "lane" was read as "worktree" every time. Each
+one needs setup it may never use, and a teardown someone has to remember. If the
+slices own different files, a terminal in this workspace IS the lane.
+
+**Open a worktree when you can name the collision**, not as insurance:
+two slices editing the same file, a risky refactor you may want to throw away, a
+lane that forks from a different base branch, or work long enough that you do not
+want the shared tree pinned to it. `git status` mixing two lanes together is the
+symptom you are buying isolation to avoid — if that cannot happen, do not buy it.
+
+### 2a · Lane here — the default
 
 ```bash
 # 0 · baseline BEFORE dispatch, or step 4's count proves nothing
@@ -111,6 +130,39 @@ pgrep -x codex | wc -l        # MUST be baseline+1
 
 # 5 · READ THE SCREEN, then arm the watcher in this same turn
 orca terminal read --terminal <handle> --screen --limit 15
+```
+
+🔴 **Sharing one tree is the whole trade.** Lanes here must own disjoint
+paths, and the lead stages **by path** — never `git add -A`, which once swept
+three lanes into one unreviewable commit.
+
+### 2b · New worktree — when you named a collision
+
+One command carries checkout, branch, agent and first prompt. Agent-first, so no
+stray fallback shell appears beside it:
+
+```bash
+orca worktree create --name <ID> --no-parent --agent codex \
+  --base-branch <the branch lanes fork from> --setup skip \
+  --prompt "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it." --json
+```
+
+The handle comes back IN that response — no `terminal list` round trip:
+`result.agentTerminalHandle` on current runtimes, `result.startupTerminal.handle`
+on older ones (the only field CLAUDE.md names). Folder-based repos can return
+neither; only then fall back to `terminal list`.
+
+**`--setup skip` is a judgement.** A fresh checkout has none of the gitignored
+config a dev stack needs, and every way that fails is silent — the server starts,
+the emulator says ready, the app hangs on its spinner. Skip it for a lane that
+only edits source; omit it for one that must boot the app.
+
+Then read the screen and arm the watcher exactly as in 2a, and post state to the
+card so the rail shows it without anyone opening the pane:
+
+```bash
+orca worktree set --worktree name:<ID> --comment "<state>" \
+  --workspace-status in-progress --json
 ```
 
 ## 3 · Flag reality — every one of these was a real failure
@@ -156,16 +208,55 @@ Version-matched truth for anything not listed: `orca skills get orca-cli`.
 agent identity** (`codex`) once the agent starts. Track lanes by handle; treat the
 title as a hint for the human, not an identifier for you.
 
-## 5 · Closing a lane
+## 5 · Closing a lane — teardown depends on which shape you opened
 
-A codex lane in a sandbox **cannot commit** — its work is sitting in the working tree
-by design. Closing the pane discards anything uncommitted, and `git status` is the
-only thing standing between you and losing a 27-minute turn.
+A codex lane in a sandbox **cannot commit** — its work sits in the working tree
+by design. Harvest before you close anything, in both shapes:
 
 ```bash
 git status --porcelain          # MUST be harvested first
+```
+
+**Lane here (2a):** close the tab. The tree is the shared one, so there is
+nothing else to remove.
+
+```bash
 orca terminal close --terminal <handle> --tab
 ```
 
-Verify the drop afterwards: `pgrep -x codex | wc -l` should fall by exactly the number
-you closed. If it does not, you closed a tab and left the agent running.
+Verify the drop: `pgrep -x codex | wc -l` should fall by exactly the number you
+closed. If it does not, you closed a tab and left the agent running.
+
+**Worktree lane (2b):** closing the tab leaves the checkout, the branch and the
+card behind — that is how eight finished lanes were still on disk days later.
+Remove the worktree:
+
+```bash
+# 1 · anything here that is not already on the integration branch?
+git -C <lane path> log --oneline <integration-branch>..HEAD   # unharvested commits
+git -C <lane path> status --porcelain                          # unharvested edits
+
+# 2 · if either is non-empty, archive first. A patch turns an irreversible
+#     delete into a reversible one, and costs nothing.
+git -C <lane path> diff HEAD > ~/orca/workspaces/.lane-archive/<ID>.patch
+
+# 3 · drop checkout, branch and card together
+orca worktree rm --worktree name:<ID> --json
+```
+
+`rm` **attempts to delete the branch too**, retaining only branches it cannot
+prove are already merged. A real safety net for commits — and no help at all for
+uncommitted work, which is why step 1 is not optional.
+
+⚠️ **A commit missing from the integration branch does not mean its CONTENT is
+missing.** A lead who harvested by copying files leaves a lane commit that is an
+ancestor of nothing while being byte-identical to what shipped. Diff before
+concluding a lane holds unique work:
+
+```bash
+git -C <lane path> diff --stat <integration-branch> HEAD -- <paths>   # empty = already shipped
+```
+
+Conversely, a large diff against the integration branch usually means the lane is
+BEHIND it, not ahead — read the deletion count. Thousands of deletions is the
+signature of a stale lane, not of work about to be lost.
