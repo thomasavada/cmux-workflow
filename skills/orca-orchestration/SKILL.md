@@ -123,7 +123,7 @@ ls .lanes/tmp/probe-<ID>      # MUST appear. If not: close the terminal, recreat
 
 # 4 · dispatch: ONE sentence pointing at the brief, model and effort pinned
 orca terminal send --terminal <handle> --enter --text \
-  'codex -s workspace-write -a never --strict-config -m gpt-5.6-sol \
+  'codex -s workspace-write -a never --strict-config -m gpt-6-astra \
    -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true \
    "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it."'
 pgrep -x codex | wc -l        # MUST be baseline+1
@@ -190,10 +190,9 @@ cannot re-dispatch by sending another `codex …` command line — it goes into 
 prompt box as a message. To get back to a shell, `send --interrupt` first.
 
 **Reasoning effort: `minimal` is rejected.** `-c model_reasoning_effort=minimal`
-returns HTTP 400 from the API (`Unsupported value … Supported values are: 'none',
-'low', 'medium', 'high', 'xhigh', and 'max'`) on `gpt-5.6-sol`. The shared skill's
-ladder lists `minimal` and warns that bad values are swallowed silently; neither
-holds here — it fails loudly, and the lane sits at an error with no turn to watch.
+returns HTTP 400 from the API (`Unsupported value … Supported values are: 'low',
+'medium', 'high', 'xhigh', and 'max'`) on `gpt-6-astra`. Use `low` for a
+mechanical GPT-6 lane; the shared skill's current ladder reflects this.
 
 🔴 **Never `2>/dev/null` an Orca command.** `send-text` failed silently behind a
 redirect for a full round: the probe file never appeared, and the obvious reading was

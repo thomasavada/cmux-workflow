@@ -127,11 +127,11 @@ The two agent lines, and the flag that matters in each:
 
 ```bash
 # codex — -a never is what stops it halting on an approval nobody is watching
-codex -s workspace-write -a never --strict-config -m gpt-5.6-sol -c model_reasoning_effort=low "Lane DEMO-1. Read BRIEF-1.md and follow it."
+codex -s workspace-write -a never --strict-config -m gpt-6-astra -c model_reasoning_effort=low "Lane DEMO-1. Read BRIEF-1.md and follow it."
 
 # claude — acceptEdits is NOT the equivalent: it auto-accepts EDITS and still stops at every Bash
 # command. Measured 2026-08-13: the lane sat on "Do you want to proceed?" looking like it was busy.
-claude --model sonnet --permission-mode bypassPermissions "Lane DEMO-2. Read BRIEF-2.md and follow it."
+claude --model sonnet --effort high --permission-mode bypassPermissions "Lane DEMO-2. Read BRIEF-2.md and follow it."
 ```
 
 🔴 **Say that codex/Claude difference out loud.** It is the most useful thing in this section and

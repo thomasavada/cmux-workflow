@@ -127,7 +127,7 @@ Write two throwaway briefs whose `owns` genuinely cannot overlap, then:
 pgrep -x codex | wc -l                 # BASELINE first, or the check after proves nothing
 
 orca terminal send --terminal "$H" --enter --text \
-  'codex -s workspace-write -a never --strict-config -m gpt-5.6-sol \
+  'codex -s workspace-write -a never --strict-config -m gpt-6-astra \
    -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true \
    "Lane D1. Read docs/plans/briefs/D1.md and follow it."'
 
@@ -139,7 +139,7 @@ pgrep -x codex | wc -l                 # MUST be baseline+1
 ```bash
 -c model_reasoning_effort=minimal      # → HTTP 400
 # Unsupported value: 'minimal' … Supported values are:
-#   'none', 'low', 'medium', 'high', 'xhigh', and 'max'
+#   'low', 'medium', 'high', 'xhigh', and 'max'
 ```
 
 The lane comes up, errors, and sits there. No turn ever starts, so there is nothing for a

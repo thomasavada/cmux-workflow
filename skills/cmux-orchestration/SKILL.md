@@ -295,33 +295,40 @@ migration against live data gets the default.
 
 | Role | Model | Why |
 |---|---|---|
-| **Orchestrating chat** — plan, briefs, verification, commits | **your host's strongest model** (Opus · Grok 4.6 · a `sol`/`terra` codex session) | it holds the whole session's context and is the only thing that verifies; a cheaper orchestrator produces cheaper verification, which is the one thing you cannot afford |
-| **Writing code in a lane** | **codex** (default), or a claude/grok lane | codex runs inside the repo and is sandboxed |
-| **Read → synthesise → judge** | **in-host subagent** (`Agent` · `spawn_subagent`), or a lane if your host has none | see §1 |
-| **Second opinion / adversarial review** | **a different family from the one that wrote the code** — grok on codex's work, codex on grok's | a different model family is worth more than the same one twice, and that holds whichever one you are |
+| **Orchestrating chat** — plan, briefs, verification, commits | **your host's strongest model** — Claude Opus 5.5 (`--model opus`) · GPT-6 Astra · Grok 4.6 | it holds the whole session's context and is the only thing that verifies; a cheaper orchestrator produces cheaper verification, which is the one thing you cannot afford |
+| **Writing code in a lane** | **GPT-6 Astra via codex** (default), or Claude Sonnet 5.5 (`--model sonnet`) when the task benefits from Claude | both run inside the repo; codex adds a filesystem sandbox |
+| **Read → synthesise → judge** | **Claude Opus 5.5** or the host's strongest in-host subagent (`Agent` · `spawn_subagent`) | see §1 |
+| **Second opinion / adversarial review** | **a different family from the one that wrote the code** — Claude/Grok on GPT-6's work; GPT-6/Grok on Claude's | a different model family is worth more than the same one twice |
 
-### codex: `sol` vs `terra` — state of knowledge, honestly
+### codex: GPT-6 Astra is the default lane model
 
 ```bash
-codex -m gpt-5.6-sol   -c model_reasoning_effort=xhigh --strict-config "…"
-codex -m gpt-5.6-terra -c model_reasoning_effort=high  --strict-config "…"
+codex -m gpt-6-astra -c model_reasoning_effort=high  --strict-config "…"
+codex -m gpt-6-astra -c model_reasoning_effort=xhigh --strict-config "…"
 ```
 
-**Verified:** `~/.codex/config.toml` defaults to `model = "gpt-5.6-terra"`,
-`model_reasoning_effort = "high"`. `gpt-5.6-sol` and `gpt-5.5` also exist.
+**Verified on this toolchain:** the Codex model picker metadata exposes `gpt-6-astra`. Older
+`gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.5` names are legacy choices, not the examples this
+workflow should keep propagating.
 
-⚠️ **`--strict-config` catches unknown config *keys*, not invalid *values*** — see the effort
-section below, where `model_reasoning_effort=bogus` was accepted and echoed. Pass it anyway (it
-catches a mistyped key name), but do **not** treat it as validation of what you set.
+⚠️ **`--strict-config` catches unknown config *keys*, not invalid *values*.** Pass it anyway
+(it catches a mistyped key name), but do **not** treat it as validation of the model or effort
+value. Read the TUI/header after launch and require it to say `gpt-6-astra` plus the intended
+effort before considering the lane dispatched.
 
-🔴 **What differentiates `sol` from `terra` is not documented anywhere I could find, and this
-skill will not invent it.** What *is* recorded: one session ran ~20 `sol` lanes covering
-two-line deletions, multi-table migrations with live-data backfill, a 30-minute corpus generator,
-and adversarial review — all successful. There is no comparable `terra` sample.
+### Claude: use the 5.5 aliases, not a stale full model ID
 
-**So: pin the model explicitly on every dispatch rather than inheriting the config default**, and
-when you learn what actually distinguishes them, write it here. A matrix built on guessed model
-characteristics is worse than an honest gap, because it gets followed.
+```bash
+claude --model sonnet --effort high  --permission-mode bypassPermissions "…"
+claude --model opus   --effort xhigh --permission-mode bypassPermissions "…"
+```
+
+In the current Claude Code release, `sonnet` and `opus` resolve to Claude 5.5. Prefer these CLI
+aliases over a dated full identifier: they are the documented interface and keep the workflow on
+the current 5.5 point release. Still read the TUI header after launch; an enterprise policy or
+provider override can resolve an alias differently.
+
+**Pin model and effort explicitly on every dispatch rather than inheriting config defaults.**
 
 ### grok — different family, no sandbox
 
@@ -337,20 +344,16 @@ so "do not commit" is a sentence in your brief, not a property of the tool, and 
 ### Effort — the full ladder, and the trap in setting it
 
 ```bash
--c model_reasoning_effort=minimal|low|medium|high|xhigh     # codex
---effort minimal|low|medium|high|xhigh                      # grok (aliases --reasoning-effort)
+-c model_reasoning_effort=low|medium|high|xhigh|max       # GPT-6 Astra via codex
+--effort low|medium|high|xhigh|max                        # Claude 5.5
+--effort minimal|low|medium|high|xhigh                    # grok
 ```
 
-🔴 **Neither CLI validates the value, and `--strict-config` does NOT help.** Verified
-2026-08-13: `codex -c model_reasoning_effort=bogus --strict-config` starts normally and prints
-`reasoning effort: bogus` in its own header. The string is passed through to the API. **A typo
-does not fail — it silently becomes whatever the provider defaults to**, and you run a whole
-session at an effort you did not choose.
-
-So: **read the value back before trusting it.** codex echoes `reasoning effort: <value>` in the
-`exec` header; grok renders it in the TUI footer as `Grok 4.6 (xhigh)`. Both echo what you typed,
-so this catches your typos — it does not prove the provider honoured the value. Treat an
-unrecognised value as *unknown effort*, not as your intended one.
+`--strict-config` validates Codex config **keys**, not model/effort availability. GPT-6 Astra
+currently rejects unsupported effort values at the API boundary; Claude Code advertises its
+accepted ladder in `--help`. Still read the model and effort back from the TUI/header before
+trusting a lane: this catches a stale alias, provider override, or a command that inherited the
+wrong config.
 
 ### Choose by blast radius, not by how hard the task feels
 
@@ -358,20 +361,14 @@ unrecognised value as *unknown effort*, not as your intended one.
 
 | Effort | Use for | Examples |
 |---|---|---|
-| **`minimal`** | one-shot mechanical edits where the diff is the whole spec | rename a symbol repo-wide · bump a version string · delete a dead import |
-| **`low`** | scripted or templated work with no judgment | generate boilerplate from an existing pattern · apply a codemod you already validated |
+| **`low`** | one-shot mechanical or templated work where the diff is the whole spec | rename a symbol repo-wide · bump a version string · apply a validated codemod |
 | **`medium`** | ordinary feature work, reversible, covered by tests | add a field to a form · a new read-only endpoint · wire an existing component |
-| **`high`** | mechanical but consequential; needs the repo's conventions followed | delete a hardcoded constant · declare a relation the DB already enforces · add an audit row |
-| **`xhigh`** | **irreversible, or arithmetic that reaches a customer** | any migration touching live data · anything computing a rate or denominator · adversarial review · a generator whose output everything else is graded against |
+| **`high`** | consequential implementation that must follow repo conventions | declare a relation · add an audit row · ordinary feature work with integration risk |
+| **`xhigh`** | irreversible or customer-facing arithmetic | live-data migration · rate/denominator calculation · adversarial review |
+| **`max`** | exceptional blast radius where another verification pass is cheaper than one miss | billing migration · security boundary · production recovery plan |
 
-**Verified in practice:** one session ran `high` and `xhigh` lanes across ~20 dispatches — two-line
-deletions through multi-table migrations with live backfill — and both behaved as briefed.
-`minimal` / `low` / `medium` are the documented ladder positions; they have **not** been exercised
-here, so treat the examples above as intent, not measurement, and correct this table when you use
-them.
-
-**Default when unsure: `high`.** It is the config default for a reason, and the cost gap between
-`high` and `xhigh` is far smaller than the cost of one bad migration.
+**Default when unsure: `high`.** Use `xhigh` or `max` for blast radius, not as compensation for
+a vague brief.
 
 ⚠️ **Do not raise effort to compensate for a vague brief.** Reaching for `xhigh` because you are
 unsure what the lane should do means the fix belongs in `## done`, not the flag. In one session
@@ -606,7 +603,7 @@ cmux send-key --surface surface:33 Enter
 ls .lanes/tmp/lane-probe-<ID> # the file MUST appear. If not ⇒ close the pane, create it again.
 
 # 4. only now send the real command, and it is ONE SENTENCE pointing at the brief
-cmux send --surface surface:33 'codex -s workspace-write -a never --strict-config -m gpt-5.6-sol -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it."'
+cmux send --surface surface:33 'codex -s workspace-write -a never --strict-config -m gpt-6-astra -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it."'
 #    ↑ pin the model and effort explicitly (§1.3) — never inherit the config default
 #    ↑ --strict-config catches unknown CONFIG KEYS. It does NOT validate the effort VALUE:
 #      a typo'd effort is echoed back and silently becomes the provider default (§1.3).
