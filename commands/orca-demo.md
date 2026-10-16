@@ -127,7 +127,7 @@ Write two throwaway briefs whose `owns` genuinely cannot overlap, then:
 pgrep -x codex | wc -l                 # BASELINE first, or the check after proves nothing
 
 orca terminal send --terminal "$H" --enter --text \
-  'codex -s workspace-write -a never --strict-config -m gpt-6-astra \
+  'codex -s workspace-write -a never --strict-config -m gpt-6.1-sol \
    -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true \
    "Lane D1. Read docs/plans/briefs/D1.md and follow it."'
 

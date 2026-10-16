@@ -296,24 +296,31 @@ migration against live data gets the default.
 | Role | Model | Why |
 |---|---|---|
 | **Orchestrating chat** — plan, briefs, verification, commits | **your host's strongest model** — Claude Opus 5.5 (`--model opus`) · GPT-6 Astra · Grok 4.6 | it holds the whole session's context and is the only thing that verifies; a cheaper orchestrator produces cheaper verification, which is the one thing you cannot afford |
-| **Writing code in a lane** | **GPT-6 Astra via codex** (default), or Claude Sonnet 5.5 (`--model sonnet`) when the task benefits from Claude | both run inside the repo; codex adds a filesystem sandbox |
+| **Writing code in a lane** | **GPT-6.1 Sol via codex** (default), or Claude Sonnet 5.5 (`--model sonnet`) when the task benefits from Claude | both run inside the repo; codex adds a filesystem sandbox. A lane executes a brief — it does not need the flagship model; buy care with effort, correctness with acceptance criteria |
 | **Read → synthesise → judge** | **Claude Opus 5.5** or the host's strongest in-host subagent (`Agent` · `spawn_subagent`) | see §1 |
 | **Second opinion / adversarial review** | **a different family from the one that wrote the code** — Claude/Grok on GPT-6's work; GPT-6/Grok on Claude's | a different model family is worth more than the same one twice |
 
-### codex: GPT-6 Astra is the default lane model
+### codex: GPT-6.1 Sol is the default lane model
 
 ```bash
-codex -m gpt-6-astra -c model_reasoning_effort=high  --strict-config "…"
-codex -m gpt-6-astra -c model_reasoning_effort=xhigh --strict-config "…"
+codex -m gpt-6.1-sol -c model_reasoning_effort=high  --strict-config "…"
+codex -m gpt-6.1-sol -c model_reasoning_effort=xhigh --strict-config "…"
 ```
 
-**Verified on this toolchain:** the Codex model picker metadata exposes `gpt-6-astra`. Older
-`gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.5` names are legacy choices, not the examples this
-workflow should keep propagating.
+🔴 **Do not reach for `gpt-6-astra` on your own.** It is the flagship and costs far more; a lane
+running a well-scoped brief gets nothing from it that `xhigh` effort on Sol does not already buy
+*(2026-10-16: four lanes dispatched on Astra by copying this section's old example, user stopped
+them — "ko cần đến astra, đến sol là ok")*. Use Astra only when the user explicitly asks for it.
+
+**The user's own config outranks every example here.** Check `model =` in `~/.codex/config.toml`
+(and any memory/CLAUDE.md note about lane models) before dispatch. If the user pinned a model
+there, pin that same model with `-m` — never overwrite their choice with a slug copied from this
+file. List live slugs with `codex debug models | jq -r '.models[]|select(.visibility=="list")|.slug'`;
+`gpt-5.x` names are legacy.
 
 ⚠️ **`--strict-config` catches unknown config *keys*, not invalid *values*.** Pass it anyway
 (it catches a mistyped key name), but do **not** treat it as validation of the model or effort
-value. Read the TUI/header after launch and require it to say `gpt-6-astra` plus the intended
+value. Read the TUI/header after launch and require it to say the model you pinned (`GPT-6.1-Sol`) plus the intended
 effort before considering the lane dispatched.
 
 ### Claude: use the 5.5 aliases, not a stale full model ID
@@ -344,12 +351,12 @@ so "do not commit" is a sentence in your brief, not a property of the tool, and 
 ### Effort — the full ladder, and the trap in setting it
 
 ```bash
--c model_reasoning_effort=low|medium|high|xhigh|max       # GPT-6 Astra via codex
+-c model_reasoning_effort=low|medium|high|xhigh|max       # GPT-6.x via codex
 --effort low|medium|high|xhigh|max                        # Claude 5.5
 --effort minimal|low|medium|high|xhigh                    # grok
 ```
 
-`--strict-config` validates Codex config **keys**, not model/effort availability. GPT-6 Astra
+`--strict-config` validates Codex config **keys**, not model/effort availability. GPT-6.x
 currently rejects unsupported effort values at the API boundary; Claude Code advertises its
 accepted ladder in `--help`. Still read the model and effort back from the TUI/header before
 trusting a lane: this catches a stale alias, provider override, or a command that inherited the
@@ -603,7 +610,7 @@ cmux send-key --surface surface:33 Enter
 ls .lanes/tmp/lane-probe-<ID> # the file MUST appear. If not ⇒ close the pane, create it again.
 
 # 4. only now send the real command, and it is ONE SENTENCE pointing at the brief
-cmux send --surface surface:33 'codex -s workspace-write -a never --strict-config -m gpt-6-astra -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it."'
+cmux send --surface surface:33 'codex -s workspace-write -a never --strict-config -m gpt-6.1-sol -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it."'
 #    ↑ pin the model and effort explicitly (§1.3) — never inherit the config default
 #    ↑ --strict-config catches unknown CONFIG KEYS. It does NOT validate the effort VALUE:
 #      a typo'd effort is echoed back and silently becomes the provider default (§1.3).

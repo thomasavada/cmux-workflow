@@ -123,7 +123,7 @@ ls .lanes/tmp/probe-<ID>      # MUST appear. If not: close the terminal, recreat
 
 # 4 · dispatch: ONE sentence pointing at the brief, model and effort pinned
 orca terminal send --terminal <handle> --enter --text \
-  'codex -s workspace-write -a never --strict-config -m gpt-6-astra \
+  'codex -s workspace-write -a never --strict-config -m gpt-6.1-sol \
    -c model_reasoning_effort=xhigh -c sandbox_workspace_write.network_access=true \
    "Lane <ID>. Read docs/plans/briefs/<ID>.md and follow it."'
 pgrep -x codex | wc -l        # MUST be baseline+1
@@ -189,9 +189,17 @@ handle is non-empty before every send; a typo here types into someone else's age
 cannot re-dispatch by sending another `codex …` command line — it goes into the
 prompt box as a message. To get back to a shell, `send --interrupt` first.
 
+🔴 **…but stop interrupting the moment codex is gone.** Interrupts sent after codex
+has already exited can take the shell down with it: the terminal then reads
+`status: exited` and every later `send` fails `terminal_not_writable` *(measured
+2026-10-16, restarting four lanes on a different model)*. Interrupt, check
+`pgrep -x codex | wc -l` is back at baseline, then stop. If a terminal shows
+`exited`, do not retry the send — `terminal close --tab`, `terminal create` a
+fresh one, and re-probe.
+
 **Reasoning effort: `minimal` is rejected.** `-c model_reasoning_effort=minimal`
 returns HTTP 400 from the API (`Unsupported value … Supported values are: 'low',
-'medium', 'high', 'xhigh', and 'max'`) on `gpt-6-astra`. Use `low` for a
+'medium', 'high', 'xhigh', and 'max'`) on GPT-6.x. Use `low` for a
 mechanical GPT-6 lane; the shared skill's current ladder reflects this.
 
 🔴 **Never `2>/dev/null` an Orca command.** `send-text` failed silently behind a
